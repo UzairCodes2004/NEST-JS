@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, } from '@nestjs/common';
-
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, ParseIntPipe , ValidationPipe} from '@nestjs/common';
+import { CreatedUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 // it will handle users routes
 @Controller('users')
@@ -34,28 +35,34 @@ export class UsersController {
         return this.userService.findAll(role)
     }
 
-    // GET /users/:id anything after user/ or params any get route will be read as user/interns and the value will be stored in get
+    // GET /users/:id anything after user/ or params any get route will be read as user/interns and the value will be stored in get  
+
+
+    // IMP INFO BELOW 
+
+    // ParseIntPipe not only transforms the id params but also include built in validation 
+
+
     @Get(':id')
-    findOne(@Param('id') id: string) {
-        const uId = parseInt(id)
-        return this.userService.findOne(uId);
+    findOne(@Param('id',ParseIntPipe) id: number) {
+       
+        return this.userService.findOne(id);
     }
 
     // POST route which post data from the body and user is the type
-    @Post() create(@Body() user: { name: string, email: string, role: 'INTERN' | 'ASE' | 'SSE' }) {
+    @Post() create(@Body(ValidationPipe) user: CreatedUserDto) {
         return this.userService.create(user)
     }
 
     @Patch(':id')
-    update(@Param('id') id: string, @Body() userUpdate: { name: string, email: string, role: 'INTERN' | 'ASE' | 'SSE' }) {
-        const uId = parseInt(id)
-        return this.userService.update(uId, userUpdate);
+    update(@Param('id',ParseIntPipe) id: number, @Body(ValidationPipe) userUpdate: UpdateUserDto) {
+        return this.userService.update(id, userUpdate as CreatedUserDto);
     }
 
     @Delete(':id')
-    delete(@Param('id') id: string) {
-        const uId = parseInt(id)
-        return this.userService.delete(uId);
+    delete(@Param('id',ParseIntPipe) id: number) {
+        
+        return this.userService.delete(id);
     }
 }
 
