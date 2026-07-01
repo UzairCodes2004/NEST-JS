@@ -4,7 +4,6 @@ import { DatabaseService } from '../database/database.service';
 import { CreatedUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import bcrypt from 'bcrypt';
-import { hash } from 'crypto';
 @Injectable()
 export class UsersService {
     constructor(private readonly databaseService: DatabaseService) { }

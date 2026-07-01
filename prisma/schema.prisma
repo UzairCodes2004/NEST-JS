@@ -35,4 +35,5 @@ model Users {
   name     String @db.VarChar(255)
   email    String @unique
   password String @db.VarChar(255)
-}
+  
+  }
