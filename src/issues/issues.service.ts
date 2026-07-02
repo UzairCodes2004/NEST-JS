@@ -7,6 +7,7 @@ import { UpdateIssueDto } from './dto/update-issue.dto';
 export class IssuesService {
     constructor(private readonly databaseService: DatabaseService) { }
 
+    
 
     async findAll() {
 
@@ -25,8 +26,18 @@ export class IssuesService {
                 }
             }
         )
+        
         if (issue === 0)
-            throw new NotFoundException("Issue not found")
+            throw new NotFoundException("Issue not found");
+        return this.databaseService.issue.findUnique({
+            where:{id,
+
+            },select:{
+                title:true,
+                description:true,
+                status:true
+            }
+        })
     }
 
     async create(issue: CreatedIssueDto) {
