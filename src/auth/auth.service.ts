@@ -30,7 +30,8 @@ export class AuthService {
         data: {
           email,
           name,
-          password: randomPassword
+          password: randomPassword,
+          registered: 'GOOGLE_OAUTH'
         }
       })
     }

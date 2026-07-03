@@ -151,12 +151,14 @@ export class UsersService {
             data: {
                 name: user.name,
                 password: hashed,
-                email: user.email
+                email: user.email,
+                registered:'CREDENTIALS'
             },
             select: {
                 id: true,
                 email: true,
                 name: true,
+                registered:true
 
             }
         });

@@ -6,6 +6,6 @@ export class LoginTypes {
     @IsNotEmpty()
     email!: string
     @IsString()
-    @IsNotEmpty()
+   
     password!: string
 }

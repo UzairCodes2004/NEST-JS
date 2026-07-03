@@ -43,7 +43,9 @@ export class IssuesService {
     async create(issue: CreatedIssueDto) {
         return this.databaseService.issue.create({
             data: {
-                ...issue
+                ...issue,
+                updatedAT: new Date(),
+                userID: 1,
             }
         })
     }

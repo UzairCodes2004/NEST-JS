@@ -1,39 +1,43 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// after every schema change use npx prisma migrate dev
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
-  
-
-}
-  
-
-model Issue {
-  id          Int      @id @default(autoincrement())
-  title       String   @db.VarChar(255)
-  description String   @db.Text
-  status      Status   @default(OPEN)
-  createdAT   DateTime @default(now())
-  updatedAT   DateTime @updatedAt
 }
 
-enum Status {
+model issue {
+  id          Int          @id @default(autoincrement())
+  title       String       @db.VarChar(255)
+  description String       @db.Text
+  status      issue_status @default(OPEN)
+  createdAT   DateTime     @default(now())
+  updatedAT   DateTime
+  userID      Int
+}
+
+model users {
+  id         Int              @id @default(autoincrement())
+  name       String           @db.VarChar(255)
+  email      String           @unique(map: "Users_email_key")
+  password   String           @db.VarChar(255)
+  registered users_registered
+  role       users_role       @default(USER)
+}
+
+enum issue_status {
   OPEN
   IN_PROGRESS
   CLOSED
 }
 
-// User Model 
-model Users {
-  id       Int    @id @default(autoincrement())
-  name     String @db.VarChar(255)
-  email    String @unique
-  password String @db.VarChar(255)
-  
-  }
+enum users_registered {
+  CREDENTIALS
+  GOOGLE_OAUTH
+}
+
+enum users_role {
+  SUPERADMIN
+  USER
+  MANAGER
+}
