@@ -13,6 +13,5 @@ export class CreatedUserDto{
     // @IsEnum(["INTERN","ASE","SSE"], {message:'Valid role required'})
     // role!:"INTERN"|"ASE"|"SSE" ;
     @IsString()
-    @IsNotEmpty()
     password!:string
 }
