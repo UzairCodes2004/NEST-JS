@@ -14,15 +14,20 @@ model issue {
   createdAT   DateTime     @default(now())
   updatedAT   DateTime
   userID      Int
+  user        users        @relation(fields: [userID], references: [id])
+
 }
 
 model users {
-  id         Int              @id @default(autoincrement())
-  name       String           @db.VarChar(255)
-  email      String           @unique(map: "Users_email_key")
-  password   String           @db.VarChar(255)
-  registered users_registered
-  role       users_role       @default(USER)
+  id            Int              @id @default(autoincrement())
+  name          String           @db.VarChar(255)
+  email         String           @unique(map: "Users_email_key")
+  password      String           @db.VarChar(255)
+  registered    users_registered
+  role          users_role       @default(USER)
+  resetToken    String?
+  tokenExpireAt DateTime?
+  issues        issue[]
 }
 
 enum issue_status {

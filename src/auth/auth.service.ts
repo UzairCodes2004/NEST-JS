@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { LoginTypes } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { nanoid } from 'nanoid';
 
 type SignInData = { userId: number; username: string };
 type AuthResult = { accessToken: string; userId: number; userName: string };
@@ -80,4 +81,69 @@ export class AuthService {
       userName: user.username,
     };
   }
+
+  async resetTokenGeneration(email: string) {
+
+    const user = await this.databaseService.users.findUnique({
+      where: {
+        email,
+      }
+    })
+    if (!user)
+      return "User doesnt exists";
+
+    const resetToken = nanoid(64);
+    const hashedResetToken = await bcrypt.hash(resetToken, 10)
+
+    const expireTokenAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.databaseService.users.update({
+      where: {
+        email,
+      },
+      data: {
+        resetToken: hashedResetToken,
+        tokenExpireAt: expireTokenAt
+      },
+    })
+    return resetToken
+  }
+
+
+  async resetPassword(input: { email: string, token: string, newPassword: string }) {
+
+    const { email, token, newPassword } = input;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const user = await this.databaseService.users.findUnique({
+      where: { email, }
+
+    })
+
+    if (!user)
+      return "Enter correct email user not found";
+
+    if (!user.resetToken || !user.tokenExpireAt || new Date() > user.tokenExpireAt) {
+      throw new BadRequestException("Reset token has expired or is invalid");
+    }
+
+    const userToken = await user.resetToken;
+    const tokenVerification = await bcrypt.compare(token, userToken!)
+    if (!tokenVerification)
+      throw new BadRequestException("Invalid token, try again");
+
+    await this.databaseService.users.update(
+      {
+        where: { email, },
+        data: {
+          resetToken: null,
+          tokenExpireAt: null,
+          password: hashedPassword
+        }
+
+      }
+    )
+    return { message: "Password reset successfully" };
+
+  }
+
 }
