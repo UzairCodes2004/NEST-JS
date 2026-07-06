@@ -6,16 +6,18 @@ import {
 } from '@nestjs/jwt';
 import { DatabaseModule } from '../database/database.module';
 import { UsersModule } from '../users/users.module';
-
+import { EmailModule } from './email/email.module';
 @Module({
   providers: [AuthService],
   controllers: [AuthController],
   imports: [UsersModule,
     DatabaseModule,
+    EmailModule,
     JwtModule.register({
       global:true,
       secret:process.env.JWT_SECRET,
-      signOptions:{expiresIn:'3d'}
+      signOptions:{expiresIn:'3d'},
+      
     })
   ]
 

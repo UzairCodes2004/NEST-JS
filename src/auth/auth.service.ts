@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { nanoid } from 'nanoid';
+import { EmailService } from './email/email.service';
 
 type SignInData = { userId: number; username: string };
 type AuthResult = { accessToken: string; userId: number; userName: string };
@@ -14,6 +15,7 @@ export class AuthService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
+    private emailService: EmailService,
   ) { }
 
 
@@ -84,13 +86,13 @@ export class AuthService {
 
   async resetTokenGeneration(email: string) {
 
-    const user = await this.databaseService.users.findUnique({
+    const user = await this.databaseService.users.findFirst({
       where: {
         email,
       }
     })
     if (!user)
-      return "User doesnt exists";
+      return null;
 
     const resetToken = nanoid(64);
     const hashedResetToken = await bcrypt.hash(resetToken, 10)
@@ -125,9 +127,7 @@ export class AuthService {
     if (!user.resetToken || !user.tokenExpireAt || new Date() > user.tokenExpireAt) {
       throw new BadRequestException("Reset token has expired or is invalid");
     }
-
-    const userToken = await user.resetToken;
-    const tokenVerification = await bcrypt.compare(token, userToken!)
+    const tokenVerification = await bcrypt.compare(token, user.resetToken!)
     if (!tokenVerification)
       throw new BadRequestException("Invalid token, try again");
 
@@ -145,5 +145,21 @@ export class AuthService {
     return { message: "Password reset successfully" };
 
   }
+  async forgotPassword(email: string): Promise<{ message: string,token?: string }> {
 
+    const rawToken = await this.resetTokenGeneration(email);
+
+    if (!rawToken) {
+      return {
+        message: 'Raw token not generated',
+      };
+    }
+
+
+    await this.emailService.sendPasswordResetEmail(email, rawToken, email);
+
+    return {
+      message: 'If an account with that email exists, a reset link has been sent.',
+    };
+  }
 }

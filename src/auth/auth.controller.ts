@@ -18,7 +18,7 @@ export class AuthController {
 
     @Post('forgot-password')
 async forgotPassword(@Body(ValidationPipe) input: ForgotPasswordDto) {
-    return this.authService.resetTokenGeneration(input.email);
+    return this.authService.forgotPassword(input.email);
 }
 
 @Post('reset-password')
