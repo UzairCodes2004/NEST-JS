@@ -112,9 +112,9 @@ export class AuthService {
   }
 
 
-  async resetPassword(input: { email: string, token: string, newPassword: string }) {
+  async resetPassword(email: string, token:string, newPassword: string) {
 
-    const { email, token, newPassword } = input;
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const user = await this.databaseService.users.findUnique({
       where: { email, }
@@ -145,7 +145,7 @@ export class AuthService {
     return { message: "Password reset successfully" };
 
   }
-  async forgotPassword(email: string): Promise<{ message: string,token?: string }> {
+  async forgotPassword(email: string): Promise<{ message: string, token?: string }> {
 
     const rawToken = await this.resetTokenGeneration(email);
 

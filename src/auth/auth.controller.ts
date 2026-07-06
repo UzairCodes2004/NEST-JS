@@ -2,7 +2,7 @@ import { Controller, ValidationPipe, Post, Body } from '@nestjs/common';
 import { LoginTypes } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
-import { ForgotPasswordDto } from './forgotpassword.dto';
+import { ForgotPasswordDto } from './dto/forgotpassword.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 @Controller('auth')
 export class AuthController {
@@ -23,6 +23,6 @@ async forgotPassword(@Body(ValidationPipe) input: ForgotPasswordDto) {
 
 @Post('reset-password')
 async resetPassword(@Body(ValidationPipe) input: ResetPasswordDto) {
-    return this.authService.resetPassword(input);
+    return this.authService.resetPassword(input.email,input.token,input.newPassword);
 }
 }
