@@ -1,10 +1,9 @@
-import { Controller, Get, ParseIntPipe, Param, Post, Body, ValidationPipe, Put, Delete } from '@nestjs/common';
+import { Controller,Req, Get, ParseIntPipe, Param, Post, Body, ValidationPipe, Put, Delete } from '@nestjs/common';
 import { IssuesService } from './issues.service';
 import { CreatedIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 @Controller('issues')
 export class IssuesController {
-
     constructor(private readonly issueService: IssuesService) { }
 
     // GET ALL THE ISSUES /issues
@@ -18,8 +17,8 @@ export class IssuesController {
         return this.issueService.findOne(id);
     }
     @Post()
-    create(@Body(ValidationPipe) issue: CreatedIssueDto) {
-        return this.issueService.create(issue)
+    async create(@Body() dto: CreatedIssueDto, @Req() req: any) {
+        return this.issueService.create(dto);
     }
 
     @Put(':id')

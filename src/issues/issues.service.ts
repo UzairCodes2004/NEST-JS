@@ -15,7 +15,22 @@ export class IssuesService {
         if (issues === 0)
             throw new NotFoundException(" Issue not found ")
 
-        return this.databaseService.issue.findMany({})
+        return this.databaseService.issue.findMany({
+            select:{
+                id:true,
+                title:true,
+                description:true,
+                status:true,
+                userID:true,
+                user:{
+                    select:{
+                        email:true,
+                        name:true,
+                        role:true,
+                    }
+                }
+            }
+        })
     }
 
     async findOne(id: number) {
@@ -43,13 +58,12 @@ export class IssuesService {
         });
     }
 
-    async create(issue: CreatedIssueDto) {
+    async create(issue: CreatedIssueDto,) {
         return this.databaseService.issue.create({
             data: {
                 ...issue,
                 updatedAT: new Date(),
-                userID: 1,
-            }
+                 userID:1          }
         })
     }
 
