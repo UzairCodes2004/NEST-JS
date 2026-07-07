@@ -48,7 +48,7 @@ export class EmailService {
               <p>Hello,</p>
               <p>We received a request to reset your password. Click the button below to set a new password:</p>
               <p style="text-align: center;">
-                <a href="${resetLink}" class="button">Reset Password</a>
+                <a style="text-color:#ffffff "href="${resetLink}" class="button">Reset Password</a>
               </p>
               <p>If you didn't request this, please ignore this email.</p>
               <p>This link will expire in 15 minutes.</p>

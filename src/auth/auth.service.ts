@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import {  BadRequestException,  Injectable, UnauthorizedException} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { LoginTypes } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
@@ -30,7 +26,7 @@ export class AuthService {
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   // Create user with google
 
@@ -154,7 +150,7 @@ export class AuthService {
     if (!user) return null;
 
     const resetToken = randomBytes(32).toString('hex');
-    const hashedResetToken = hashToken(resetToken); 
+    const hashedResetToken = hashToken(resetToken);
 
     const expireTokenAt = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -194,6 +190,7 @@ export class AuthService {
   }
 
   async resetPassword(email: string, token: string, newPassword: string) {
+    await this.validateResetToken(email,token);
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!token || token.length !== 64) {
@@ -244,6 +241,10 @@ export class AuthService {
   async forgotPassword(
     email: string,
   ): Promise<{ message: string; token?: string }> {
+    const user = await this.databaseService.users.findUnique({ where: { email } });
+    if (!user)
+      throw new BadRequestException("User with this email doesnt exist enter valid email");
+
     const normalizedEmail = email.trim().toLowerCase();
     const rawToken = await this.resetTokenGeneration(normalizedEmail);
 

@@ -7,7 +7,7 @@ import { UpdateIssueDto } from './dto/update-issue.dto';
 export class IssuesService {
     constructor(private readonly databaseService: DatabaseService) { }
 
-    
+
 
     async findAll() {
 
@@ -19,25 +19,28 @@ export class IssuesService {
     }
 
     async findOne(id: number) {
-        const issue = await this.databaseService.issue.count(
-            {
-                where: {
-                    id,
+        const issueCount = await this.databaseService.issue.count({
+            where: { id }
+        });
+
+        if (issueCount === 0) {
+            throw new NotFoundException("Issue not found");
+        }
+
+        return this.databaseService.issue.findUnique({
+            where: { id },
+            select: {
+                title: true,
+                description: true,
+                status: true,
+                user: {
+                    select: {
+                        name: true,
+                        role: true
+                    }
                 }
             }
-        )
-        
-        if (issue === 0)
-            throw new NotFoundException("Issue not found");
-        return this.databaseService.issue.findUnique({
-            where:{id,
-
-            },select:{
-                title:true,
-                description:true,
-                status:true
-            }
-        })
+        });
     }
 
     async create(issue: CreatedIssueDto) {
