@@ -16,13 +16,14 @@ model issue {
   userID      Int
   user        users        @relation(fields: [userID], references: [id])
 
+  @@index([userID], map: "issue_userID_fkey")
 }
 
 model users {
   id            Int              @id @default(autoincrement())
   name          String           @db.VarChar(255)
   email         String           @unique(map: "Users_email_key")
-  password      String           @db.VarChar(255)
+  password      String?          @db.VarChar(255)
   registered    users_registered
   role          users_role       @default(USER)
   resetToken    String?

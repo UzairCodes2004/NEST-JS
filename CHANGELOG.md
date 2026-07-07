@@ -85,3 +85,21 @@ export class UsersService {
     }
 }
 ```
+
+---
+
+## 5. Updates (Google OAuth & Password Reset Link Fixes)
+
+We resolved two issues that arose during implementation of Google OAuth sign-in and Password Reset functionality:
+
+### A. What Was Wrong
+1. **Outdated schema.prisma**: The schema file in the codebase was out of sync with the database migrations, missing critical fields like `resetToken`, `tokenExpireAt`, `registered`, `role`, and table relations. This caused Prisma Client generation to enforce non-nullable fields on things like `password` and fail on modern database properties.
+2. **Google Sign-In validation error**: In `validateOrCreateGoogleUser`, the code attempted to set `password: null as unknown as string` to bypass type checks, but since `schema.prisma` had `password` marked as non-nullable, it crashed at runtime.
+3. **TypeScript error in validateUser**: Because the database column for `password` actually is nullable, updating the schema led to a compilation error in `validateUser` because `bcrypt.compare` does not accept `null` for `user.password`.
+4. **Token Generation issue (nanoid in CommonJS)**: The `nanoid` package installed (`^5.1.16`) is an ES Module (ESM) package. When imported in a CommonJS project compiled by NestJS, it throws `ERR_REQUIRE_ESM` at runtime and fails to generate the raw token.
+
+### B. What We Changed & Why
+1. **Introspected database**: Ran `npx prisma db pull` to restore the correct schema definitions (including relationships, enums, and optional password flags) from the MySQL database, then regenerated the client using `npx prisma generate`.
+2. **Type-safe validateUser**: Added a check `if (!user || !user.password)` in `validateUser` to gracefully handle OAuth users (who have no local password) and satisfy compiler checks.
+3. **Clean Google user creation**: Simplified `password: null` in `validateOrCreateGoogleUser` now that the field is correctly optional in the schema.
+4. **Native Token Generation**: Replaced `nanoid(64)` with Node's native `crypto.randomBytes(32).toString('hex')` to generate a secure 64-character token. This has zero dependencies, avoids ESM conflicts entirely, and works out-of-the-box in all environments.
