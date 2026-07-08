@@ -15,18 +15,26 @@ export class IssuesService {
         if (issues === 0)
             throw new NotFoundException(" Issue not found ")
 
-        return this.databaseService.issue.findMany({
-            select:{
-                id:true,
-                title:true,
-                description:true,
-                status:true,
-                userID:true,
-                user:{
-                    select:{
-                        email:true,
-                        name:true,
-                        role:true,
+        return await this.databaseService.issue.findMany({
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                status: true,
+                userID: true,
+                updatedByUser: {
+                    select: {
+                        email: true,
+                        name: true,
+                        role: true,
+                    }
+                },
+
+                user: {
+                    select: {
+                        email: true,
+                        name: true,
+                        role: true,
                     }
                 }
             }
@@ -50,6 +58,14 @@ export class IssuesService {
                 status: true,
                 user: {
                     select: {
+                        email: true,
+                        name: true,
+                        role: true
+                    }
+                },
+                updatedByUser: {
+                    select: {
+                        email: true,
                         name: true,
                         role: true
                     }
@@ -58,21 +74,27 @@ export class IssuesService {
         });
     }
 
-    async create(issue: CreatedIssueDto,) {
+    async create(issue: CreatedIssueDto, userId: number) {
         return this.databaseService.issue.create({
             data: {
                 ...issue,
                 updatedAT: new Date(),
-                 userID:1          }
+                updatedByUserId: userId,
+                userID: userId
+            }
         })
     }
 
-    async editIssue(id: number, updatedIssue: UpdateIssueDto) {
+    async editIssue(id: number, updatedIssue: UpdateIssueDto, userId: number) {
 
         return this.databaseService.issue.update({
             where: {
                 id,
-            }, data: { ...updatedIssue }
+            }, data: {
+                ...updatedIssue,
+                updatedByUserId: userId,
+                updatedAT: new Date(),
+            }
         })
     }
     async delete(id: number) {

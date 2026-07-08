@@ -2,7 +2,12 @@ import { Controller,Req, Get, ParseIntPipe, Param, Post, Body, ValidationPipe, P
 import { IssuesService } from './issues.service';
 import { CreatedIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { UseGuards } from '@nestjs/common';
+
+
 @Controller('issues')
+@UseGuards(AuthGuard('jwt'))
 export class IssuesController {
     constructor(private readonly issueService: IssuesService) { }
 
@@ -16,15 +21,22 @@ export class IssuesController {
     findOne(@Param('id', ParseIntPipe) id: number) {
         return this.issueService.findOne(id);
     }
-    @Post()
-    async create(@Body() dto: CreatedIssueDto, @Req() req: any) {
-        return this.issueService.create(dto);
-    }
+    // create issues 
 
-    @Put(':id')
-    editIssue(@Param('id', ParseIntPipe) id: number, @Body(ValidationPipe) updatedIssue: UpdateIssueDto) {
-        return this.issueService.editIssue(id, updatedIssue)
-    }
+    @Post()
+  async create(@Body(ValidationPipe) issue: CreatedIssueDto, @Req() req: any) {
+    const userId = req.user.id; 
+    return this.issueService.create(issue, userId);
+  }
+// edit issues
+
+     @Put(':id')
+  async editIssue(@Param('id',ParseIntPipe) id: number,@Body() updatedIssue: UpdateIssueDto, @Req() req: any) {
+    const userId = req.user.id;
+    const userIdInt= parseInt(userId);
+    return this.issueService.editIssue(id, updatedIssue, userIdInt);
+  }
+
     @Delete(':id')
     delete(@Param('id', ParseIntPipe) id: number) {
         return this.issueService.delete(id)
