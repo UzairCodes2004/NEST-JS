@@ -15,30 +15,7 @@ export class IssuesService {
         if (issues === 0)
             throw new NotFoundException(" Issue not found ")
 
-        return await this.databaseService.issue.findMany({
-            select: {
-                id: true,
-                title: true,
-                description: true,
-                status: true,
-                userID: true,
-                updatedByUser: {
-                    select: {
-                        email: true,
-                        name: true,
-                        role: true,
-                    }
-                },
-
-                user: {
-                    select: {
-                        email: true,
-                        name: true,
-                        role: true,
-                    }
-                }
-            }
-        })
+        return await this.databaseService.issue.findMany({})
     }
 
     async findOne(id: number) {
