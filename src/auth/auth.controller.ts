@@ -1,17 +1,20 @@
-import { Controller, ValidationPipe, Post, Body } from '@nestjs/common';
+import { Controller, ValidationPipe, Post, Body, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { LoginTypes } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { ForgotPasswordDto } from './dto/forgotpassword.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';        // updated DTO
+import { ValidateResetTokenDto } from './dto/validate-reset-token.dto'; // updated DTO
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+
   @Post('google')
   async googleAuth(@Body(ValidationPipe) body: GoogleAuthDto) {
     return this.authService.googleSignIn(body.idToken);
   }
+
   @Post('login')
   login(@Body(ValidationPipe) input: LoginTypes) {
     return this.authService.signIn(input);
@@ -23,16 +26,16 @@ export class AuthController {
   }
 
   @Post('validate-reset-token')
+  @HttpCode(HttpStatus.OK)
   async validateResetToken(@Body(ValidationPipe) input: ValidateResetTokenDto) {
-    return this.authService.validateResetToken(input.email, input.token);
+   
+    return this.authService.validateResetTokenWithData(input.data);
   }
 
   @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
   async resetPassword(@Body(ValidationPipe) input: ResetPasswordDto) {
-    return this.authService.resetPassword(
-      input.email,
-      input.token,
-      input.newPassword,
-    );
+   
+    return this.authService.resetPasswordWithData(input.data, input.newPassword);
   }
 }

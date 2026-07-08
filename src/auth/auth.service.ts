@@ -1,9 +1,8 @@
-import {  BadRequestException,  Injectable, UnauthorizedException} from '@nestjs/common';
+import {BadRequestException,Injectable,UnauthorizedException} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { LoginTypes } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-
 import { EmailService } from '../email/email.service';
 import { createHash, randomBytes } from 'crypto';
 
@@ -26,16 +25,11 @@ export class AuthService {
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
     private emailService: EmailService,
-  ) { }
+  ) {}
 
-  // Create user with google
-
-  async validateOrCreateGoogleUser(
-    email: string,
-    name: string,
-  ): Promise<SignInData> {
+  // ---------- Existing Google & Sign‑in methods (unchanged) ----------
+  async validateOrCreateGoogleUser(email: string, name: string): Promise<SignInData> {
     const normalizedEmail = email.trim().toLowerCase();
-
     let user = await this.databaseService.users.findUnique({
       where: { email: normalizedEmail },
     });
@@ -54,6 +48,7 @@ export class AuthService {
       username: user.name,
     };
   }
+
   async validateUser(input: LoginTypes): Promise<SignInData | null> {
     const user = await this.databaseService.users.findUnique({
       where: { email: input.email },
@@ -73,6 +68,7 @@ export class AuthService {
       username: user.name,
     };
   }
+
   private async verifyGoogleIdToken(idToken: string) {
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
 
@@ -140,8 +136,7 @@ export class AuthService {
     };
   }
 
-  //password reset
-
+  // ---------- Password Reset---------
   async resetTokenGeneration(email: string) {
     const normalizedEmail = email.trim().toLowerCase();
     const user = await this.databaseService.users.findFirst({
@@ -162,10 +157,7 @@ export class AuthService {
     return resetToken;
   }
 
-  async validateResetToken(
-    email: string,
-    token: string,
-  ): Promise<{ valid: true }> {
+  async validateResetToken(email: string, token: string): Promise<{ valid: true }> {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!token || token.length !== 64) {
@@ -190,7 +182,7 @@ export class AuthService {
   }
 
   async resetPassword(email: string, token: string, newPassword: string) {
-    await this.validateResetToken(email,token);
+    await this.validateResetToken(email, token);
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!token || token.length !== 64) {
@@ -238,12 +230,11 @@ export class AuthService {
 
     return { message: 'Password reset successfully' };
   }
-  async forgotPassword(
-    email: string,
-  ): Promise<{ message: string; token?: string }> {
+
+  async forgotPassword(email: string): Promise<{ message: string; token?: string }> {
     const user = await this.databaseService.users.findUnique({ where: { email } });
     if (!user)
-      throw new BadRequestException("User with this email doesnt exist enter valid email");
+      throw new BadRequestException('User with this email does not exist. Enter a valid email.');
 
     const normalizedEmail = email.trim().toLowerCase();
     const rawToken = await this.resetTokenGeneration(normalizedEmail);
@@ -254,7 +245,6 @@ export class AuthService {
           'If an account with that email exists, a reset link has been sent.',
       };
     }
-
     await this.emailService.sendPasswordResetEmail(
       normalizedEmail,
       rawToken,
@@ -265,5 +255,43 @@ export class AuthService {
       message:
         'If an account with that email exists, a reset link has been sent.',
     };
+  }
+
+  /**
+   * Decodes the base64-encoded JSON payload that contains email and token.
+   * Throws BadRequestException if decoding fails.
+   */
+  private decodeResetData(encoded: string): { email: string; token: string } {
+    try {
+      const base64 = decodeURIComponent(encoded);
+      // Base64 decode to JSON string
+      const json = Buffer.from(base64, 'base64').toString('utf-8');
+      // Parse JSON
+      const parsed = JSON.parse(json);
+      if (parsed.email && parsed.token) {
+        return { email: parsed.email, token: parsed.token };
+      }
+      throw new Error('Missing email or token in payload');
+    } catch (error) {
+      throw new BadRequestException(
+        'Invalid reset data format. Please request a new reset link.',
+      );
+    }
+  }
+
+  
+  async validateResetTokenWithData(data: string): Promise<{ valid: boolean }> {
+    const { email, token } = this.decodeResetData(data);
+    try {
+      await this.validateResetToken(email, token);
+      return { valid: true };
+    } catch (error) {
+      return { valid: false };
+    }
+  }
+
+  async resetPasswordWithData(data: string, newPassword: string): Promise<{ message: string }> {
+    const { email, token } = this.decodeResetData(data);
+    return await this.resetPassword(email, token, newPassword);
   }
 }
