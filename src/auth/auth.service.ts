@@ -4,7 +4,7 @@ import { LoginTypes } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
-import { EmailService } from './email/email.service';
+import { EmailService } from '../email/email.service';
 import { createHash, randomBytes } from 'crypto';
 
 function hashToken(token: string): string {
