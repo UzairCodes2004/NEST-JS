@@ -9,9 +9,10 @@ import { IssuesModule } from './issues/issues.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
-  imports: [UsersModule, DatabaseModule, IssuesModule, AuthModule],
+  imports: [UsersModule, DatabaseModule, IssuesModule, AuthModule, CommentsModule],
   controllers: [AppController, IssuesController],
   providers: [AppService, IssuesService],
 })

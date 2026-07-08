@@ -7,14 +7,18 @@ datasource db {
 }
 
 model issue {
-  id          Int          @id @default(autoincrement())
-  title       String       @db.VarChar(255)
-  description String       @db.Text
-  status      issue_status @default(OPEN)
-  createdAT   DateTime     @default(now())
-  updatedAT   DateTime
-  userID      Int
-  user        users        @relation(fields: [userID], references: [id])
+  id              Int          @id @default(autoincrement())
+  title           String       @db.VarChar(255)
+  description     String       @db.Text
+  status          issue_status @default(OPEN)
+  createdAT       DateTime     @default(now())
+  updatedAT       DateTime
+  userID          Int
+  updatedByUserId Int?
+  user            users        @relation(fields: [userID], references: [id])
+  updatedByUser   users?       @relation("IssueUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  comments comment[]
 
   @@index([userID], map: "issue_userID_fkey")
 }
@@ -29,6 +33,23 @@ model users {
   resetToken    String?
   tokenExpireAt DateTime?
   issues        issue[]
+
+  editedIssues issue[] @relation("IssueUpdatedBy")
+
+  comments comment[]
+}
+
+model comment {
+  id        Int      @id @default(autoincrement())
+  text      String   @db.Text
+  createdAT DateTime @default(now())
+  updatedAT DateTime @updatedAt
+
+  userID Int
+  user   users @relation(fields: [userID], references: [id])
+
+  issueID Int
+  issue   issue @relation(fields: [issueID], references: [id])
 }
 
 enum issue_status {

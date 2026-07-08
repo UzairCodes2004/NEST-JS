@@ -1,0 +1,17 @@
+-- CreateTable
+CREATE TABLE `comment` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `text` TEXT NOT NULL,
+    `createdAT` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAT` DATETIME(3) NOT NULL,
+    `userID` INTEGER NOT NULL,
+    `issueID` INTEGER NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `comment` ADD CONSTRAINT `comment_userID_fkey` FOREIGN KEY (`userID`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `comment` ADD CONSTRAINT `comment_issueID_fkey` FOREIGN KEY (`issueID`) REFERENCES `issue`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
