@@ -27,31 +27,28 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
+  // Promote to SUPER ADMIN
+  private async promoteToSuperAdminIfEligible(email: string, userId: number): Promise<void> {
+    const superAdminEmails = process.env.SUPERADMIN_EMAILS
+      ?.split(',')
+      .map(e => e.trim().toLowerCase()) || [];
 
-// Promote to SUPER ADMIN
-private async promoteToSuperAdminIfEligible(email:string,userId:number):Promise<void>{
+    const normalizedEmail = email.trim().toLowerCase();
 
-  const superAdminEmail=process.env.SUPERADMIN_EMAILS?.trim().toLowerCase();
-  const normalizedEmail = email.trim().toLowerCase();
-  if (superAdminEmail?.includes(normalizedEmail)){
-const user=await this.databaseService.users.findUnique({
-  where:{
-    id:userId
-  },
-  select:{
-    role:true
+    if (superAdminEmails.includes(normalizedEmail)) {
+    const user = await this.databaseService.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (user && user.role !== 'SUPERADMIN') {
+      await this.databaseService.users.update({
+        where: { id: userId },
+        data: { role: 'SUPERADMIN' },
+      });
+      console.log(`✅ User ${email} promoted to SUPERADMIN`);
+    }
   }
-});
-if(user&&user.role!=='SUPERADMIN'){
-  await this.databaseService.users.update({
-    where:{id:userId },
-    data:{role:'SUPERADMIN'}
-  });
-  // for checking 
-  console.log(`User WITH EMAIL ${email} promoted to SUPERADMIN`)
-}
-  }
-   
 }
 
 
@@ -160,7 +157,7 @@ if(!updatedUser){
     const accessToken = await this.jwtService.signAsync({
       sub: user.userId,
       username: user.username,
-      role:user.role   // added role
+      role:user.role  
     });
     return { accessToken, userId: user.userId, userName: user.username, role:user.role };
   }
@@ -175,6 +172,7 @@ if(!updatedUser){
     const tokenPayload = {
       sub: user.userId,
       username: user.username,
+      role:user.role,
     };
 
     const accessToken = await this.jwtService.signAsync(tokenPayload);
