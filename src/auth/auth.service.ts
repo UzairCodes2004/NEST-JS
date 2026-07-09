@@ -9,8 +9,8 @@ import { createHash, randomBytes } from 'crypto';
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
-type SignInData = { userId: number; username: string };
-type AuthResult = { accessToken: string; userId: number; userName: string };
+type SignInData = { userId: number; username: string,role:string };
+type AuthResult = { accessToken: string; userId: number; userName: string, role:string};
 type GoogleTokenInfo = {
   aud?: string;
   email?: string;
@@ -26,6 +26,34 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private emailService: EmailService,
   ) {}
+
+
+// Promote to SUPER ADMIN
+private async promoteToSuperAdminIfEligible(email:string,userId:number):Promise<void>{
+
+  const superAdminEmail=process.env.SUPERADMIN_EMAILS?.trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
+  if (superAdminEmail?.includes(normalizedEmail)){
+const user=await this.databaseService.users.findUnique({
+  where:{
+    id:userId
+  },
+  select:{
+    role:true
+  }
+});
+if(user&&user.role!=='SUPERADMIN'){
+  await this.databaseService.users.update({
+    where:{id:userId },
+    data:{role:'SUPERADMIN'}
+  });
+  // for checking 
+  console.log(`User WITH EMAIL ${email} promoted to SUPERADMIN`)
+}
+  }
+   
+}
+
 
   // ---------- Existing Google & Sign‑in methods (unchanged) ----------
   async validateOrCreateGoogleUser(email: string, name: string): Promise<SignInData> {
@@ -43,9 +71,18 @@ export class AuthService {
         },
       });
     }
+    // Promoting to admin if eligible
+    await this.promoteToSuperAdminIfEligible(normalizedEmail, user.id);
+
+const updatedUser= await this.databaseService.users.findUnique({where:{id:user.id}});
+
+if(!updatedUser){
+  throw new Error ('User not found after promoton')
+}
     return {
-      userId: user.id,
-      username: user.name,
+      userId: updatedUser.id,
+      username: updatedUser.name,
+      role:updatedUser.role
     };
   }
 
@@ -63,9 +100,21 @@ export class AuthService {
       return null;
     }
 
+    // promote to SUPERADMIN if eligible
+    await this.promoteToSuperAdminIfEligible(user.email,user.id)
+    
+    // getting user with updated role
+
+    const updatedUser= await this.databaseService.users.findUnique({where:{id:user.id}});
+
+    if(!updatedUser){
+  throw new Error ('User not found after promoton')
+}
+
     return {
-      userId: user.id,
-      username: user.name,
+      userId: updatedUser.id,
+      username: updatedUser.name,
+      role:updatedUser.role
     };
   }
 
@@ -111,8 +160,9 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync({
       sub: user.userId,
       username: user.username,
+      role:user.role   // added role
     });
-    return { accessToken, userId: user.userId, userName: user.username };
+    return { accessToken, userId: user.userId, userName: user.username, role:user.role };
   }
 
   async signIn(input: LoginTypes): Promise<AuthResult> {
@@ -133,10 +183,11 @@ export class AuthService {
       accessToken,
       userId: user.userId,
       userName: user.username,
+      role:user.role
     };
   }
 
-  // ---------- Password Reset---------
+
   async resetTokenGeneration(email: string) {
     const normalizedEmail = email.trim().toLowerCase();
     const user = await this.databaseService.users.findFirst({
@@ -257,10 +308,7 @@ export class AuthService {
     };
   }
 
-  /**
-   * Decodes the base64-encoded JSON payload that contains email and token.
-   * Throws BadRequestException if decoding fails.
-   */
+  
   private decodeResetData(encoded: string): { email: string; token: string } {
     try {
       const base64 = decodeURIComponent(encoded);
