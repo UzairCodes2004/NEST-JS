@@ -28,7 +28,7 @@ export class CommentsController {
   @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCommentDto, @Req() req: RequestWithUser
-  ) {
+  ) {    
     const userId = req.user.id;
     return this.commentsService.update(id, dto, userId);
   }
