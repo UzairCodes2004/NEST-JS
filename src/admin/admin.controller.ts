@@ -65,7 +65,7 @@ export class AdminController {
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
   ) {
-    return this.adminService.getIssueById(id, req.user.role);
+    return this.adminService.getIssueById(id,req.user.id, req.user.role);
   }
 
   @Put('issues/:id')
@@ -82,7 +82,7 @@ export class AdminController {
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
   ) {
-    return this.adminService.deleteIssue(id, req.user.role);
+    return this.adminService.deleteIssue(id,req.user.id, req.user.role);
   }
 
   // ─── Comments ───

@@ -8,7 +8,7 @@ export interface RequestWithUser {
   user: {
     id: number;          
     email: string;      
-    role?: string;       
+    role: string;       
   };
 }
 
@@ -22,7 +22,8 @@ export class CommentsController {
     @Body() dto: CreateCommentDto,@Req() req: RequestWithUser
   ) {
     const userId = req.user.id;
-    return this.commentsService.create(dto, userId);
+    const userRole=req.user.role;
+    return this.commentsService.create(dto, userId,userRole);
   }
 
   @Put(':id')
@@ -30,14 +31,16 @@ export class CommentsController {
     @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCommentDto, @Req() req: RequestWithUser
   ) {    
     const userId = req.user.id;
-    return this.commentsService.update(id, dto, userId);
+    const userRole=req.user.role;
+    return this.commentsService.update(id, dto, userId,userRole);
   }
 
   @Delete(':id')
   async delete(
     @Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser ) {
     const userId = req.user.id;
-    return this.commentsService.delete(id, userId);
+     const userRole = req.user.role;
+    return this.commentsService.delete(id, userId,userRole);
   }
 
   @Get('issue/:issueId')async getCommentsForIssue(

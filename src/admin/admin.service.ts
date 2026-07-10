@@ -144,22 +144,22 @@ export class AdminService {
   }
 
   // Reuse IssuesService for single issue
-  async getIssueById(id: number, userRole: UserRole) {
+  async getIssueById(id: number,userId:number, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
-    return this.issuesService.findOne(id);
+    return this.issuesService.findOne(id,userId,userRole);
   }
 
   // Admin only: Update any issue (reuse IssuesService.editIssue)
-  async updateIssue(id: number, dto: UpdateIssueDto, userRole: UserRole, adminUserId: number) {
+  async updateIssue(id: number, updatedIssue: UpdateIssueDto, userRole: UserRole, adminUserId: number) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
     // Reuse the existing editIssue but pass the admin's ID as the "editor"
-    return this.issuesService.editIssue(id, dto, adminUserId);
+    return this.issuesService.editIssue(id, updatedIssue, adminUserId,userRole);
   }
 
   // Admin only: Delete ANY issue (SUPERADMIN only)
-  async deleteIssue(id: number, userRole: UserRole) {
+  async deleteIssue(id: number,userId:number, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN']); // only SUPERADMIN can delete ANY issue
-    return this.issuesService.delete(id); // ← reuse IssuesService.delete
+    return this.issuesService.delete(id,userId,userRole); // ← reuse IssuesService.delete
   }
 
   // ─── COMMENTS ────

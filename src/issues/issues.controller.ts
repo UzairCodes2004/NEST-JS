@@ -4,7 +4,13 @@ import { CreatedIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { UseGuards } from '@nestjs/common';
-
+export interface RequestWithUser {
+  user: {
+    id: number;
+    email: string;
+    role: string;
+  };
+}
 
 @Controller('issues')
 @UseGuards(AuthGuard('jwt'))
@@ -13,13 +19,17 @@ export class IssuesController {
 
     // GET ALL THE ISSUES /issues
     @Get()
-    findAll() {
-        return this.issueService.findAll();
+    findAll(@Req() req:RequestWithUser) {
+      const userId=req.user.id;
+      const userRole=req.user.role;
+        return this.issueService.findAll(userId,userRole);
 
     }
     @Get(':id')
-    findOne(@Param('id', ParseIntPipe) id: number) {
-        return this.issueService.findOne(id);
+    findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+      const userId=req.user.id;
+      const userRole=req.user.role;
+        return this.issueService.findOne(id,userId,userRole);
     }
     // create issues 
 
@@ -33,13 +43,16 @@ export class IssuesController {
      @Put(':id')
   async editIssue(@Param('id',ParseIntPipe) id: number,@Body() updatedIssue: UpdateIssueDto, @Req() req: any) {
     const userId = req.user.id;
+    const userRole=req.user.role;
     const userIdInt= parseInt(userId);
-    return this.issueService.editIssue(id, updatedIssue, userIdInt);
+    return this.issueService.editIssue(id, updatedIssue, userIdInt,userRole);
   }
 
     @Delete(':id')
-    delete(@Param('id', ParseIntPipe) id: number) {
-        return this.issueService.delete(id)
+    delete(@Param('id', ParseIntPipe) id: number, @Req() req:RequestWithUser) {
+      const userId=req.user.id;
+      const userRole=req.user.role;
+        return this.issueService.delete(id,userId,userRole)
     }
 
 }
