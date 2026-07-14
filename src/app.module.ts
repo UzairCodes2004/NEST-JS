@@ -11,11 +11,12 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { CommentsModule } from './comments/comments.module';
 import { AdminModule } from './admin/admin.module';
+import { ManagerRequestsModule } from './manager-request/manager-request.module';
 
 @Module({
-  imports: [UsersModule, DatabaseModule, IssuesModule, AuthModule, CommentsModule, AdminModule],
+  imports: [UsersModule, DatabaseModule, IssuesModule, AuthModule, CommentsModule, AdminModule, ManagerRequestsModule],
   controllers: [AppController, IssuesController],
-  providers: [AppService, IssuesService],
+  providers: [AppService],
 })
 export class AppModule {}
  

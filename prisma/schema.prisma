@@ -6,51 +6,6 @@ datasource db {
   provider = "mysql"
 }
 
-model issue {
-  id              Int          @id @default(autoincrement())
-  title           String       @db.VarChar(255)
-  description     String       @db.Text
-  status          issue_status @default(OPEN)
-  createdAT       DateTime     @default(now())
-  updatedAT       DateTime
-  userID          Int
-  updatedByUserId Int?
-  user            users        @relation(fields: [userID], references: [id])
-  updatedByUser   users?       @relation("IssueUpdatedBy", fields: [updatedByUserId], references: [id])
-
-  comments comment[]
-
-  @@index([userID], map: "issue_userID_fkey")
-}
-
-model users {
-  id            Int              @id @default(autoincrement())
-  name          String           @db.VarChar(255)
-  email         String           @unique(map: "Users_email_key")
-  password      String?          @db.VarChar(255)
-  registered    users_registered
-  role          users_role       @default(USER)
-  resetToken    String?
-  tokenExpireAt DateTime?
-  issues        issue[]
-
-  editedIssues issue[] @relation("IssueUpdatedBy")
-
-  comments comment[]
-}
-
-model comment {
-  id        Int      @id @default(autoincrement())
-  text      String   @db.Text
-  createdAT DateTime @default(now())
-  updatedAT DateTime @updatedAt
-
-  userID Int
-  user   users @relation(fields: [userID], references: [id])
-
-  issueID Int
-  issue   issue @relation(fields: [issueID], references: [id])
-}
 
 enum issue_status {
   OPEN
@@ -67,4 +22,72 @@ enum users_role {
   SUPERADMIN
   USER
   MANAGER
+}
+
+enum manager_request_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Models 
+
+// Issue Model
+
+model issue {
+  id              Int          @id @default(autoincrement())
+  title           String       @db.VarChar(255)
+  description     String       @db.Text
+  status          issue_status @default(OPEN)
+  createdAT       DateTime     @default(now())
+  updatedAT       DateTime
+  userID          Int
+  updatedByUserId Int?
+  user            users        @relation(fields: [userID], references: [id])
+  updatedByUser   users?       @relation("IssueUpdatedBy", fields: [updatedByUserId], references: [id])
+  comments        comment[]    
+}
+
+// comment model
+model comment {
+  id        Int      @id @default(autoincrement())
+  text      String   @db.Text
+  createdAT DateTime @default(now())
+  updatedAT DateTime @updatedAt
+  userID    Int
+  user      users    @relation(fields: [userID], references: [id])
+  issueID   Int
+  issue     issue    @relation(fields: [issueID], references: [id])
+}
+
+model users {
+  id            Int              @id @default(autoincrement())
+  name          String           @db.VarChar(255)
+  email         String           @unique(map: "Users_email_key")
+  password      String?          @db.VarChar(255)
+  registered    users_registered
+  role          users_role       @default(USER)
+  resetToken    String?
+  tokenExpireAt DateTime?
+  issues        issue[]         
+  editedIssues  issue[]          @relation("IssueUpdatedBy")
+  comments      comment[]        
+  managerRequests   manager_requests[] @relation("manager_requests_userID_fkey")
+  reviewedRequests  manager_requests[] @relation("ManagerRequestReviewer")
+}
+
+model manager_requests {
+  id          Int                    @id @default(autoincrement())
+  userId      Int
+  user        users                  @relation("manager_requests_userID_fkey", fields: [userId], references: [id]) 
+  status      manager_request_status @default(PENDING)
+  reviewedBy  Int?
+  reviewer    users?                 @relation("ManagerRequestReviewer", fields: [reviewedBy], references: [id]) 
+  reviewedAt  DateTime?
+  notes       String?                @db.Text
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

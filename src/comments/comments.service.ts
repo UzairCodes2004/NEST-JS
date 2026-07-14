@@ -1,32 +1,37 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+// src/comments/comments.service.ts
+
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { PermissionsService, CommentResource, UserContext } from '../common/permission/permission.service';
+import { IssuesService } from '../issues/issues.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
-import { IssuesService } from '../issues/issues.service';
+import { toRole } from '../common/enums/role.enum';
 
 @Injectable()
 export class CommentsService {
-  constructor(private readonly databaseService: DatabaseService,
-    private readonly issueService:IssuesService
-    
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly permissions: PermissionsService,
+    private readonly issuesService: IssuesService,
   ) {}
 
-  async create(comment: CreateCommentDto, userId: number,userRole:string) {
-
-    await this.issueService.findOne(comment.issueID, userId, userRole);
+  async create(createCommentDto: CreateCommentDto, userId: number, userRole: string) {
+    // Delegate permission check to IssuesService (which uses PermissionsService)
+    await this.issuesService.findOne(createCommentDto.issueID, userId, userRole);
+    // If it didn't throw, user has permission
 
     return this.databaseService.comment.create({
       data: {
-        text: comment.text,
-        issueID: comment.issueID,
+        text: createCommentDto.text,
+        issueID: createCommentDto.issueID,
         userID: userId,
       },
     });
   }
 
-  async update(id: number, updateComment: UpdateCommentDto, userId: number,userRole:string) {
-
-   const existing = await this.databaseService.comment.findUnique({
+  async update(id: number, updateCommentDto: UpdateCommentDto, userId: number, userRole: string) {
+    const existing = await this.databaseService.comment.findUnique({
       where: { id },
       select: { userID: true },
     });
@@ -35,41 +40,19 @@ export class CommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-        if (
-      userRole !== 'MANAGER' &&
-      userRole !== 'SUPERADMIN' &&
-      existing.userID !== userId
-    ) {
+    const user: UserContext = { id: userId, role: toRole(userRole) };
+    const resource: CommentResource = { id, userID: existing.userID };
+
+    if (!this.permissions.canEditComment(user, resource)) {
       throw new ForbiddenException('You do not have permission to edit this comment');
     }
 
     return this.databaseService.comment.update({
       where: { id },
-      data: {
-        text: updateComment.text,
-        
-      },
+      data: { text: updateCommentDto.text },
     });
   }
 
-  async findAllForIssue(issueId: number) {
-    return this.databaseService.comment.findMany({
-      where: { issueID: issueId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
-      orderBy: { createdAT: 'desc' },
-    });
-  }
-
-  // deleting comment
   async delete(id: number, userId: number, userRole: string) {
     const existing = await this.databaseService.comment.findUnique({
       where: { id },
@@ -80,15 +63,25 @@ export class CommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-    // Allow if: manager/admin OR the user owns the comment
-    if (
-      userRole !== 'MANAGER' &&
-      userRole !== 'SUPERADMIN' &&
-      existing.userID !== userId
-    ) {
+    const user: UserContext = { id: userId, role: toRole(userRole) };
+    const resource: CommentResource = { id, userID: existing.userID };
+
+    if (!this.permissions.canDeleteComment(user, resource)) {
       throw new ForbiddenException('You do not have permission to delete this comment');
     }
 
     return this.databaseService.comment.delete({ where: { id } });
+  }
+
+  async findAllForIssue(issueId: number) {
+    return this.databaseService.comment.findMany({
+      where: { issueID: issueId },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+      orderBy: { createdAT: 'desc' },
+    });
   }
 }

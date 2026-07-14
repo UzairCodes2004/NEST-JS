@@ -1,16 +1,29 @@
-import {BadRequestException,Injectable,UnauthorizedException} from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { LoginTypes } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from '../email/email.service';
 import { createHash, randomBytes } from 'crypto';
+import { Role, toRole } from '../common/enums/role.enum';
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
-type SignInData = { userId: number; username: string,role:string };
-type AuthResult = { accessToken: string; userId: number; userName: string, role:string};
+
+type SignInData = {
+  userId: number;
+  username: string;
+  role: Role;
+};
+
+type AuthResult = {
+  accessToken: string;
+  userId: number;
+  userName: string;
+  role: Role;
+};
+
 type GoogleTokenInfo = {
   aud?: string;
   email?: string;
@@ -27,7 +40,8 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
-  // Promote to SUPER ADMIN
+  // ─── Promote to SUPERADMIN if email is in whitelist ────────────────────
+
   private async promoteToSuperAdminIfEligible(email: string, userId: number): Promise<void> {
     const superAdminEmails = process.env.SUPERADMIN_EMAILS
       ?.split(',')
@@ -36,28 +50,29 @@ export class AuthService {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (superAdminEmails.includes(normalizedEmail)) {
-    const user = await this.databaseService.users.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (user && user.role !== 'SUPERADMIN') {
-      await this.databaseService.users.update({
+      const user = await this.databaseService.users.findUnique({
         where: { id: userId },
-        data: { role: 'SUPERADMIN' },
+        select: { role: true },
       });
-      console.log(`✅ User ${email} promoted to SUPERADMIN`);
+
+      if (user && user.role !== Role.SUPERADMIN) {
+        await this.databaseService.users.update({
+          where: { id: userId },
+          data: { role: Role.SUPERADMIN },
+        });
+        console.log(`✅ User ${email} promoted to SUPERADMIN`);
+      }
     }
   }
-}
 
+  // ─── Google OAuth ────────────────────────────────────────────────────────
 
-  // ---------- Existing Google & Sign‑in methods (unchanged) ----------
   async validateOrCreateGoogleUser(email: string, name: string): Promise<SignInData> {
     const normalizedEmail = email.trim().toLowerCase();
     let user = await this.databaseService.users.findUnique({
       where: { email: normalizedEmail },
     });
+
     if (!user) {
       user = await this.databaseService.users.create({
         data: {
@@ -65,23 +80,29 @@ export class AuthService {
           name,
           password: null,
           registered: 'GOOGLE_OAUTH',
+          role: Role.USER, // Default role
         },
       });
     }
-    // Promoting to admin if eligible
+
     await this.promoteToSuperAdminIfEligible(normalizedEmail, user.id);
 
-const updatedUser= await this.databaseService.users.findUnique({where:{id:user.id}});
+    const updatedUser = await this.databaseService.users.findUnique({
+      where: { id: user.id },
+    });
 
-if(!updatedUser){
-  throw new Error ('User not found after promoton')
-}
+    if (!updatedUser) {
+      throw new Error('User not found after promotion');
+    }
+
     return {
       userId: updatedUser.id,
       username: updatedUser.name,
-      role:updatedUser.role
+      role: toRole(updatedUser.role),
     };
   }
+
+  // ─── Credentials Login ──────────────────────────────────────────────────
 
   async validateUser(input: LoginTypes): Promise<SignInData | null> {
     const user = await this.databaseService.users.findUnique({
@@ -97,21 +118,20 @@ if(!updatedUser){
       return null;
     }
 
-    // promote to SUPERADMIN if eligible
-    await this.promoteToSuperAdminIfEligible(user.email,user.id)
-    
-    // getting user with updated role
+    await this.promoteToSuperAdminIfEligible(user.email, user.id);
 
-    const updatedUser= await this.databaseService.users.findUnique({where:{id:user.id}});
+    const updatedUser = await this.databaseService.users.findUnique({
+      where: { id: user.id },
+    });
 
-    if(!updatedUser){
-  throw new Error ('User not found after promoton')
-}
+    if (!updatedUser) {
+      throw new Error('User not found after promotion');
+    }
 
     return {
       userId: updatedUser.id,
       username: updatedUser.name,
-      role:updatedUser.role
+      role: toRole(updatedUser.role),
     };
   }
 
@@ -154,12 +174,19 @@ if(!updatedUser){
   async googleSignIn(idToken: string): Promise<AuthResult> {
     const { email, name } = await this.verifyGoogleIdToken(idToken);
     const user = await this.validateOrCreateGoogleUser(email, name);
+
     const accessToken = await this.jwtService.signAsync({
       sub: user.userId,
       username: user.username,
-      role:user.role  
+      role: user.role,
     });
-    return { accessToken, userId: user.userId, userName: user.username, role:user.role };
+
+    return {
+      accessToken,
+      userId: user.userId,
+      userName: user.username,
+      role: user.role,
+    };
   }
 
   async signIn(input: LoginTypes): Promise<AuthResult> {
@@ -172,7 +199,7 @@ if(!updatedUser){
     const tokenPayload = {
       sub: user.userId,
       username: user.username,
-      role:user.role,
+      role: user.role,
     };
 
     const accessToken = await this.jwtService.signAsync(tokenPayload);
@@ -181,10 +208,11 @@ if(!updatedUser){
       accessToken,
       userId: user.userId,
       userName: user.username,
-      role:user.role
+      role: user.role,
     };
   }
 
+  // ─── Password Reset ──────────────────────────────────────────────────────
 
   async resetTokenGeneration(email: string) {
     const normalizedEmail = email.trim().toLowerCase();
@@ -282,8 +310,9 @@ if(!updatedUser){
 
   async forgotPassword(email: string): Promise<{ message: string; token?: string }> {
     const user = await this.databaseService.users.findUnique({ where: { email } });
-    if (!user)
+    if (!user) {
       throw new BadRequestException('User with this email does not exist. Enter a valid email.');
+    }
 
     const normalizedEmail = email.trim().toLowerCase();
     const rawToken = await this.resetTokenGeneration(normalizedEmail);
@@ -306,13 +335,10 @@ if(!updatedUser){
     };
   }
 
-  
   private decodeResetData(encoded: string): { email: string; token: string } {
     try {
       const base64 = decodeURIComponent(encoded);
-      // Base64 decode to JSON string
       const json = Buffer.from(base64, 'base64').toString('utf-8');
-      // Parse JSON
       const parsed = JSON.parse(json);
       if (parsed.email && parsed.token) {
         return { email: parsed.email, token: parsed.token };
@@ -325,7 +351,6 @@ if(!updatedUser){
     }
   }
 
-  
   async validateResetTokenWithData(data: string): Promise<{ valid: boolean }> {
     const { email, token } = this.decodeResetData(data);
     try {
