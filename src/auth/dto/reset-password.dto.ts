@@ -1,12 +1,10 @@
-import { IsString, IsNotEmpty, MinLength } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
 
 export class ResetPasswordDto {
   @IsString()
-  @IsNotEmpty()
   data!: string;
 
   @IsString()
-  @IsNotEmpty()
-  @MinLength(6)
+  @MinLength(6, { message: 'Password must be at least 6 characters' })
   newPassword!: string;
 }

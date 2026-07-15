@@ -281,6 +281,16 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset link');
     }
 
+    if (!user.password) {
+      throw new BadRequestException('Unable to validate current password');
+    }
+
+    // Compare new password with stored hash
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new BadRequestException('New password cannot be the same as your current password.');
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const result = await this.databaseService.users.updateMany({
       where: {
