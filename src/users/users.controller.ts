@@ -93,7 +93,7 @@ export class UsersController {
 
 
 
-    @Post()
+    @Post('register')
     register(@Body(ValidationPipe) user: CreatedUserDto) {
         return this.userService.register(user);
     }

@@ -351,15 +351,15 @@ export class AuthService {
     }
   }
 
-  async validateResetTokenWithData(data: string): Promise<{ valid: boolean }> {
-    const { email, token } = this.decodeResetData(data);
-    try {
-      await this.validateResetToken(email, token);
-      return { valid: true };
-    } catch (error) {
-      return { valid: false };
-    }
+async validateResetTokenWithData(data: string): Promise<{ valid: boolean; email?: string }> {
+  const { email, token } = this.decodeResetData(data);
+  try {
+    await this.validateResetToken(email, token);
+    return { valid: true, email };
+  } catch (error) {
+    return { valid: false };
   }
+}
 
   async resetPasswordWithData(data: string, newPassword: string): Promise<{ message: string }> {
     const { email, token } = this.decodeResetData(data);
