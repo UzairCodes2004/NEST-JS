@@ -1,109 +1,100 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, ParseIntPipe, ValidationPipe, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  ParseIntPipe,
+  ValidationPipe,
+  UseGuards,
+  Req,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { UsersService } from './users.service';
 import { CreatedUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UsersService } from './users.service';
-// it will handle users routes
+import { PermissionsService, UserContext } from '../common/permission/permission.service';
+import { toRole } from '../common/enums/role.enum';
+import { RequestWithUser } from '../common/interfaces/request-with-user.interface';
+
 @Controller('users')
 export class UsersController {
-    // routes we want to handle below
+  constructor(
+    private readonly userService: UsersService,
+    private readonly permissionsService: PermissionsService,
+  ) {}
 
-    /*
-    GET /users
-    GET /users/:id
-    POST /users
-    PATCH /users/:id
-    DELETE /users/:id
-    */
+  // ─── Helper ──────────────────────────────────────────────────────────────
+  private buildUserContext(userId: number, role: string): UserContext {
+    return { id: userId, role: toRole(role) };
+  }
 
-    // GET /users
+  // ─── Public Registration ────────────────────────────────────────────────
+  @Post('register')
+  register(@Body(ValidationPipe) user: CreatedUserDto) {
+    return this.userService.register(user);
+  }
 
-    // was giving duplicate function error so commented out this one
-
-    // @Get()
-    // findAll() {
-    //     return [];
-    // }
-
-    // QUERY PARAMS
-    // GET /users?role=admin
-
-    // Constructor handles the user servicce does same as creating a constructor but if we have created it else where it will fetch that too
-
-    constructor(private readonly userService: UsersService) { }
-
-    //CRUD METHODS USING ARRAY
-
-
-    // @Get()
-    // findAll(@Query('role') role?: 'INTERN' | 'ASE' | 'SSE') {
-    //     return this.userService.findAll(role)
-    // }
-
-    // // GET /users/:id anything after user/ or params any get route will be read as user/interns and the value will be stored in get  
-
-
-    // // IMP INFO BELOW 
-
-    // // ParseIntPipe not only transforms the id params but also include built in validation 
-
-
-    // @Get(':id')
-    // findOne(@Param('id',ParseIntPipe) id: number) {
-
-    //     return this.userService.findOne(id);
-    // }
-
-    // // POST route which post data from the body and user is the type
-    // @Post() create(@Body(ValidationPipe) user: CreatedUserDto) {
-    //     return this.userService.create(user)
-    // }
-
-    // @Patch(':id')
-    // update(@Param('id',ParseIntPipe) id: number, @Body(ValidationPipe) userUpdate: UpdateUserDto) {
-    //     return this.userService.update(id, userUpdate as CreatedUserDto);
-    // }
-
-    // @Delete(':id')
-    // delete(@Param('id',ParseIntPipe) id: number) {
-
-    //     return this.userService.delete(id);
-    // }
-
-
-
-    // REST API WITH DATABASE INTEGRATION
-
-
-    // GET ALL USERS
-    @Get()
-    findAll() {
-        return this.userService.findAll();
+  // ─── Protected Routes ────────────────────────────────────────────────────
+// Find All Users
+  @Get()
+  @UseGuards(AuthGuard('jwt'))
+  async findAll(@Req() req: RequestWithUser) {
+    const user = this.buildUserContext(req.user.id, req.user.role);
+    if (!this.permissionsService.canViewUsers(user)) {
+      throw new ForbiddenException('You do not have permission to view all users.');
     }
-    // GET USER BY ID users/:id
-    @Get(':id')
-    findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.findAll();
+  }
 
-        return this.userService.findOne(id);
+  @Get(':id')
+  @UseGuards(AuthGuard('jwt'))
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    const requestingUser = this.buildUserContext(req.user.id, req.user.role);
+
+    // Users can view their own profile; SUPERADMIN can view any
+    if (requestingUser.id !== id && !this.permissionsService.canViewUsers(requestingUser)) {
+      throw new ForbiddenException('You do not have permission to view this user.');
     }
 
-    @Delete(':id')
-    delete(@Param('id', ParseIntPipe) id: number) {
-        return this.userService.delete(id);
+    const user = await this.userService.findOne(id);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
+  }
+
+  @Put(':id')
+  @UseGuards(AuthGuard('jwt'))
+  async edit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body(ValidationPipe) updatedUser: UpdateUserDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const requestingUser = this.buildUserContext(req.user.id, req.user.role);
+
+    // Allow if user is editing their own profile, or has permission to edit any user
+    const isSelf = requestingUser.id === id;
+    const canEditAny = this.permissionsService.canEditUserRole(requestingUser);
+
+    if (!isSelf && !canEditAny) {
+      throw new ForbiddenException('You do not have permission to edit this user.');
     }
 
+    return this.userService.edit(id, updatedUser);
+  }
 
-
-    @Post('register')
-    register(@Body(ValidationPipe) user: CreatedUserDto) {
-        return this.userService.register(user);
+  @Delete(':id')
+  @UseGuards(AuthGuard('jwt'))
+  async delete(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    const user = this.buildUserContext(req.user.id, req.user.role);
+    if (!this.permissionsService.canDeleteUser(user)) {
+      throw new ForbiddenException('You do not have permission to delete users.');
     }
-
-
-    @Put(':id')
-    edit(@Param('id', ParseIntPipe) id: number, @Body(ValidationPipe) updatedUser: UpdateUserDto) {
-        return this.userService.edit(id, updatedUser)
-    }
-
+    return this.userService.delete(id);
+  }
 }
-
-

@@ -3,7 +3,8 @@ import {
   Controller, Get, Post, Body,
   Patch, Param, Delete, ParseIntPipe,
   UseGuards, Req, Put, ForbiddenException,
-  NotFoundException} from '@nestjs/common';
+  NotFoundException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminService } from './admin.service';
 import { UpdateIssueDto } from '../issues/dto/update-issue.dto';
@@ -139,6 +140,25 @@ export class AdminController {
   }
 
   // ─── COMMENTS ────────────────────────────────────────────────────────────
+
+  // NEW: GET a single comment by ID
+  @Get('comments/:id')
+  async getCommentById(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    const user = this.buildUserContext(req.user.id, req.user.role);
+    // Check if user has admin or manager panel access
+    if (
+      !this.permissionsService.canAccessAdminPanel(user) &&
+      !this.permissionsService.canAccessManagerPanel(user)
+    ) {
+      throw new ForbiddenException('You do not have permission to view this comment.');
+    }
+    const comment = await this.adminService.getCommentById(id);
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+    return comment;
+  }
+
   @Get('comments')
   async getAllComments(@Req() req: RequestWithUser) {
     const user = this.buildUserContext(req.user.id, req.user.role);
@@ -155,19 +175,16 @@ export class AdminController {
   async deleteComment(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     const user = this.buildUserContext(req.user.id, req.user.role);
 
-    // 1. Fetch the comment to get its owner
     const comment = await this.adminService.getCommentById(id);
     if (!comment) {
       throw new NotFoundException('Comment not found');
     }
 
-    // 2. Check permission
     const commentResource = { id: comment.id, userID: comment.userID };
     if (!this.permissionsService.canDeleteComment(user, commentResource)) {
       throw new ForbiddenException('You do not have permission to delete this comment.');
     }
 
-    // 3. Delete the comment
     return this.adminService.deleteComment(id);
   }
 }

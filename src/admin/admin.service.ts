@@ -138,10 +138,27 @@ export class AdminService {
   }
   // src/admin/admin.service.ts – add this method:
 
+// ─── Get a single comment by ID (full data) ──────────────────────────────
 async getCommentById(id: number) {
   return this.databaseService.comment.findUnique({
     where: { id },
-    select: { id: true, userID: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+      issue: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+        },
+      },
+    },
   });
 }
 

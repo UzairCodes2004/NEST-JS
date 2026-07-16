@@ -3,9 +3,10 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { DatabaseModule } from '../database/database.module';
 import { ManagerRequestsModule } from '../manager-request/manager-request.module';
+import { PermissionsModule } from '../common/permission/permission.module';
 @Module({
 
-imports:[DatabaseModule,ManagerRequestsModule],
+imports:[DatabaseModule,ManagerRequestsModule,PermissionsModule],
 controllers:[UsersController],
 providers:[UsersService],
 exports:[UsersService]

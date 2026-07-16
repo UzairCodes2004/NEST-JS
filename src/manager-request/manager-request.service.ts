@@ -1,16 +1,12 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { PermissionsService, UserContext } from '../common/permission/permission.service';
-import { Role, toRole } from '../common/enums/role.enum';
+import { Role } from '../common/enums/role.enum';
 import { CreateManagerRequestDto } from './dto/create-manager-request.dto';
 import { ReviewManagerRequestDto, ReviewAction } from './dto/review-manager-request.dto';
 
 @Injectable()
 export class ManagerRequestsService {
-  constructor(
-    private readonly databaseService: DatabaseService,
-    private readonly permissions: PermissionsService,
-  ) { }
+  constructor(private readonly databaseService: DatabaseService) {}
 
   // ─── Create a manager request ──────────────────────────────────────────
 
@@ -43,7 +39,6 @@ export class ManagerRequestsService {
         userId,
         status: 'PENDING',
         notes: dto.reason,
-        // Store experience in notes or add a separate field if needed
       },
       include: {
         user: {
@@ -58,14 +53,9 @@ export class ManagerRequestsService {
     });
   }
 
-  // ─── Get all pending requests (SUPER_ADMIN only) ──────────────────────
+  // ─── Get all pending requests ──────────────────────────────────────────
 
-  async findAllPending(reviewerRole: string) {
-    const role = toRole(reviewerRole);
-    if (role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('Only SUPER_ADMIN can view pending requests.');
-    }
-
+  async findAllPending() {
     return this.databaseService.manager_requests.findMany({
       where: { status: 'PENDING' },
       include: {
@@ -83,14 +73,9 @@ export class ManagerRequestsService {
     });
   }
 
-  // ─── Get all requests (including history) 
+  // ─── Get all requests (including history) ──────────────────────────────
 
-  async findAll(reviewerRole: string) {
-    const role = toRole(reviewerRole);
-    if (role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('Only SUPER_ADMIN can view all requests.');
-    }
-
+  async findAll() {
     return this.databaseService.manager_requests.findMany({
       include: {
         user: {
@@ -116,13 +101,7 @@ export class ManagerRequestsService {
 
   // ─── Get requests for a specific user ──────────────────────────────────
 
-  async findUserRequests(userId: number, requestingUserId: number, requestingUserRole: string) {
-    const role = toRole(requestingUserRole);
-    // Users can view their own requests; SUPER_ADMIN can view anyone's
-    if (userId !== requestingUserId && role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('You can only view your own requests.');
-    }
-
+  async findUserRequests(userId: number) {
     return this.databaseService.manager_requests.findMany({
       where: { userId },
       include: {
@@ -140,17 +119,7 @@ export class ManagerRequestsService {
 
   // ─── Review a manager request ──────────────────────────────────────────
 
-  async review(
-    requestId: number,
-    reviewerUserId: number,
-    reviewerUserRole: string,
-    dto: ReviewManagerRequestDto,
-  ) {
-    const role = toRole(reviewerUserRole);
-    if (role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('Only SUPER_ADMIN can review manager requests.');
-    }
-
+  async review(requestId: number, reviewerUserId: number, dto: ReviewManagerRequestDto) {
     const request = await this.databaseService.manager_requests.findUnique({
       where: { id: requestId },
       include: { user: true },
@@ -166,7 +135,7 @@ export class ManagerRequestsService {
 
     // Prevent SUPER_ADMIN from approving/rejecting their own request
     if (request.userId === reviewerUserId) {
-      throw new ForbiddenException('You cannot review your own manager request.');
+      throw new BadRequestException('You cannot review your own manager request.');
     }
 
     const isApproved = dto.action === ReviewAction.APPROVE;
@@ -215,12 +184,7 @@ export class ManagerRequestsService {
 
   // ─── Get statistics for dashboard ──────────────────────────────────────
 
-  async getStats(reviewerRole: string) {
-    const role = toRole(reviewerRole);
-    if (role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('Only SUPER_ADMIN can view request statistics.');
-    }
-
+  async getStats() {
     const [pending, approved, rejected, total] = await Promise.all([
       this.databaseService.manager_requests.count({ where: { status: 'PENDING' } }),
       this.databaseService.manager_requests.count({ where: { status: 'APPROVED' } }),
