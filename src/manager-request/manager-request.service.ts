@@ -15,16 +15,13 @@ export class ManagerRequestsService {
   // ─── Create a manager request ──────────────────────────────────────────
 
   async create(userId: number, dto: CreateManagerRequestDto) {
-    // Check if user already has a pending request
-    const existingPending = await this.databaseService.manager_requests.findFirst({
-      where: {
-        userId,
-        status: 'PENDING',
-      },
+    // Check if user already has ANY manager request (pending, approved, rejected)
+    const existingRequest = await this.databaseService.manager_requests.findFirst({
+      where: { userId },
     });
 
-    if (existingPending) {
-      throw new BadRequestException('You already have a pending manager request.');
+    if (existingRequest) {
+      throw new BadRequestException('You already have a manager request. Only one request is allowed.');
     }
 
     // Check if user is already a manager or super admin

@@ -6,7 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { EmailService } from '../email/email.service';
 import { createHash, randomBytes } from 'crypto';
 import { Role, toRole, Permission } from '../common/enums/role.enum';
-import { PermissionsService } from '../common/permission/permission.service'; 
+import { PermissionsService } from '../common/permission/permission.service';
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -18,11 +18,13 @@ type SignInData = {
   role: Role;
 };
 
+// Updated: includes permissions
 type AuthResult = {
   accessToken: string;
   userId: number;
   userName: string;
   role: Role;
+  permissions: Permission[];
 };
 
 type GoogleTokenInfo = {
@@ -39,7 +41,7 @@ export class AuthService {
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
     private emailService: EmailService,
-    private readonly permissionsService: PermissionsService, 
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   // ─── Promote to SUPERADMIN if email is in whitelist ────────────────────
@@ -173,23 +175,34 @@ export class AuthService {
     };
   }
 
+  // ─── GOOGLE SIGN IN (updated with permissions) ─────────────────────────
+
   async googleSignIn(idToken: string): Promise<AuthResult> {
     const { email, name } = await this.verifyGoogleIdToken(idToken);
     const user = await this.validateOrCreateGoogleUser(email, name);
 
+    //  Get permissions for the user's role
+    const permissions = this.permissionsService.getUserPermissions(user.role);
+
+    //  Include permissions in JWT payload
     const accessToken = await this.jwtService.signAsync({
       sub: user.userId,
       username: user.username,
       role: user.role,
+      permissions: permissions.permissions, //  Add permissions
     });
 
+    //  Return permissions in response
     return {
       accessToken,
       userId: user.userId,
       userName: user.username,
       role: user.role,
+      permissions: permissions.permissions, //  Add permissions
     };
   }
+
+  // ─── CREDENTIALS SIGN IN (updated with permissions) ────────────────────
 
   async signIn(input: LoginTypes): Promise<AuthResult> {
     const user = await this.validateUser(input);
@@ -198,19 +211,28 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    //  Get permissions for the user's role
+    const permissions = this.permissionsService.getUserPermissions(user.role);
+
+    
+    //  Include permissions in JWT payload
     const tokenPayload = {
       sub: user.userId,
       username: user.username,
       role: user.role,
+      permissions: permissions.permissions, //  Add permissions
     };
 
+    
     const accessToken = await this.jwtService.signAsync(tokenPayload);
 
+    //  Return permissions in response
     return {
       accessToken,
       userId: user.userId,
       userName: user.username,
       role: user.role,
+      permissions: permissions.permissions, // Add permissions
     };
   }
 
@@ -287,7 +309,6 @@ export class AuthService {
       throw new BadRequestException('Unable to validate current password');
     }
 
-    // Compare new password with stored hash
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
       throw new BadRequestException('New password cannot be the same as your current password.');
@@ -378,7 +399,8 @@ export class AuthService {
     return await this.resetPassword(email, token, newPassword);
   }
 
-  // ─── NEW: Get current user's permissions ──────────────────────────────────
+  // ─── Get current user's permissions ────────────────────────────────────
+
   async getCurrentUserPermissions(userId: number): Promise<{ role: Role; permissions: Permission[] }> {
     const user = await this.databaseService.users.findUnique({
       where: { id: userId },

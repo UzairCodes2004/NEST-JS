@@ -1,12 +1,10 @@
-import {
-  Injectable, ForbiddenException, NotFoundException, BadRequestException,
-} from '@nestjs/common';
+// src/admin/admin.service.ts
+import { Injectable, NotFoundException, BadRequestException,} from '@nestjs/common';
 import { IssuesService } from '../issues/issues.service';
 import { UsersService } from '../users/users.service';
 import { DatabaseService } from '../database/database.service';
 import { UpdateIssueDto } from '../issues/dto/update-issue.dto';
-
-export type UserRole = 'SUPERADMIN' | 'MANAGER' | 'USER';
+import { Role } from '../common/enums/role.enum';
 
 @Injectable()
 export class AdminService {
@@ -16,19 +14,10 @@ export class AdminService {
     private readonly databaseService: DatabaseService,
   ) {}
 
-  // Helper: Role check
-  private checkRole(userRole: UserRole, allowed: UserRole[]): void {
-    if (!allowed.includes(userRole)) {
-      throw new ForbiddenException(
-        `Access denied. Required: ${allowed.join(' or ')}`,
-      );
-    }
-  }
-
   // ─── USERS ────────────────────────────────────────────────────────────────
 
-  async getAllUsers(userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN']);
+// Get all users
+  async getAllUsers() {
     return this.databaseService.users.findMany({
       select: {
         id: true,
@@ -36,33 +25,27 @@ export class AdminService {
         email: true,
         role: true,
         registered: true,
-        issues: {
-          select: { id: true, title: true, status: true },
-        },
-        comments: {
-          select: { id: true, text: true, issueID: true },
-        },
+        issues: { select: { id: true, title: true, status: true } },
+        comments: { select: { id: true, text: true, issueID: true } },
       },
     });
   }
+    // GET USER BY ID 
 
-  async getUserById(id: number, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN']);
+  async getUserById(id: number) {
     return this.usersService.findOne(id);
   }
-
-  async updateUserRole(userId: number, newRole: UserRole, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN']);
-
-    const user = await this.databaseService.users.findUnique({
+// UPDATE USER ROLE
+  async updateRole(userId: number, newRole: Role) {
+    const target = await this.databaseService.users.findUnique({
       where: { id: userId },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!target) throw new NotFoundException('User not found');
 
     // Prevent demoting the only SUPERADMIN
-    if (user.role === 'SUPERADMIN' && newRole !== 'SUPERADMIN') {
+    if (target.role === Role.SUPERADMIN && newRole !== Role.SUPERADMIN) {
       const count = await this.databaseService.users.count({
-        where: { role: 'SUPERADMIN' },
+        where: { role: Role.SUPERADMIN },
       });
       if (count <= 1) {
         throw new BadRequestException('Cannot demote the only SUPERADMIN.');
@@ -76,29 +59,25 @@ export class AdminService {
     });
   }
 
-  async deleteUser(userId: number, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN']);
-
-    const user = await this.databaseService.users.findUnique({
+  // DELETE A USER ALSO PREVENT ADMIN DELETION IF THERE IS ONLY ONE ADMIN
+  async deleteUser(userId: number) {
+    const target = await this.databaseService.users.findUnique({
       where: { id: userId },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!target) throw new NotFoundException('User not found');
 
-    if (user.role === 'SUPERADMIN') {
+    if (target.role === Role.SUPERADMIN) {
       const count = await this.databaseService.users.count({
-        where: { role: 'SUPERADMIN' },
+        where: { role: Role.SUPERADMIN },
       });
       if (count <= 1) {
         throw new BadRequestException('Cannot delete the only SUPERADMIN.');
       }
     }
 
-    await this.databaseService.comment.deleteMany({
-      where: { userID: userId },
-    });
-    await this.databaseService.issue.deleteMany({
-      where: { userID: userId },
-    });
+    await this.databaseService.comment.deleteMany({ where: { userID: userId } });
+    await this.databaseService.issue.deleteMany({ where: { userID: userId } });
+    await this.databaseService.manager_requests.deleteMany({ where: { userId } });
 
     return this.databaseService.users.delete({
       where: { id: userId },
@@ -108,16 +87,13 @@ export class AdminService {
 
   // ─── ISSUES ──────────────────────────────────────────────────────────────
 
-  async getAllIssues(userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
+// GET ALL ISSUES
+
+  async getAllIssues() {
     return this.databaseService.issue.findMany({
       include: {
-        user: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        updatedByUser: {
-          select: { id: true, name: true, email: true, role: true },
-        },
+        user: { select: { id: true, name: true, email: true, role: true } },
+        updatedByUser: { select: { id: true, name: true, email: true, role: true } },
         comments: {
           select: {
             id: true,
@@ -131,41 +107,45 @@ export class AdminService {
     });
   }
 
-  // ✅ Fixed: `findOne` now only expects `id`
-  async getIssueById(id: number, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
+  async getIssueById(id: number) {
     return this.issuesService.findOne(id);
   }
 
-  async updateIssue(id: number, updatedIssue: UpdateIssueDto, userRole: UserRole, adminUserId: number) {
-    this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
-    return this.issuesService.editIssue(id, updatedIssue, adminUserId, userRole);
+  async updateIssue(id: number, updatedIssue: UpdateIssueDto, adminUserId: number) {
+    const issue = await this.issuesService.findOne(id);
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    return this.issuesService.editIssue(id, updatedIssue, adminUserId, 'ADMIN');
   }
 
-  async deleteIssue(id: number, userId: number, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN']);
-    return this.issuesService.delete(id, userId, userRole);
+  async deleteIssue(id: number, adminUserId: number) {
+    const issue = await this.issuesService.findOne(id);
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    return this.issuesService.delete(id, adminUserId, 'ADMIN');
   }
 
   // ─── COMMENTS ─────────────────────────────────────────────────────────────
 
-  async getAllComments(userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
+  async getAllComments() {
     return this.databaseService.comment.findMany({
       include: {
-        user: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        issue: {
-          select: { id: true, title: true, status: true },
-        },
+        user: { select: { id: true, name: true, email: true, role: true } },
+        issue: { select: { id: true, title: true, status: true } },
       },
       orderBy: { createdAT: 'desc' },
     });
   }
+  // src/admin/admin.service.ts – add this method:
 
-  async deleteComment(id: number, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
+async getCommentById(id: number) {
+  return this.databaseService.comment.findUnique({
+    where: { id },
+    select: { id: true, userID: true },
+  });
+}
+
+  async deleteComment(id: number) {
     const comment = await this.databaseService.comment.findUnique({
       where: { id },
     });
@@ -175,9 +155,7 @@ export class AdminService {
 
   // ─── DASHBOARD STATS ─────────────────────────────────────────────────────
 
-  async getStats(userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
-
+  async getStats() {
     const [totalIssues, totalUsers, totalComments] = await Promise.all([
       this.databaseService.issue.count(),
       this.databaseService.users.count(),

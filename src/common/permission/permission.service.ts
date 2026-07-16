@@ -5,7 +5,8 @@
 
 import { Injectable } from '@nestjs/common';
 import {
-  Role,Permission, hasPermission, getPermissionsForRole, isAdmin, isManager,} from '../enums/role.enum';
+  Role, Permission, hasPermission, getPermissionsForRole, isAdmin, isManager,
+} from '../enums/role.enum';
 
 // ─── Types ───────────
 
@@ -43,7 +44,9 @@ export class PermissionsService {
   hasPermission(user: UserContext, permission: Permission): boolean {
     return hasPermission(user.role, permission);
   }
-
+  canEditRole(user: UserContext): boolean {
+    return this.canEditUserRole(user);
+  }
   // ─── Issue Permissions ──────────────────────────────────────────────────
 
   canViewIssue(user: UserContext, issue: IssueResource): boolean {
