@@ -12,10 +12,19 @@ import { AuthModule } from './auth/auth.module';
 import { CommentsModule } from './comments/comments.module';
 import { AdminModule } from './admin/admin.module';
 import { ManagerRequestsModule } from './manager-request/manager-request.module';
+import { PermissionsModule } from './common/permission/permission.module';
 
 @Module({
-  imports: [UsersModule, DatabaseModule, IssuesModule, AuthModule, CommentsModule, AdminModule, ManagerRequestsModule],
-  controllers: [AppController, IssuesController],
+  imports: [
+    UsersModule,
+    DatabaseModule,
+    IssuesModule,      // ← IssuesController is registered inside IssuesModule
+    AuthModule,
+    CommentsModule,    // ← CommentsController is registered inside CommentsModule
+    AdminModule,       // ← AdminController is registered inside AdminModule
+    PermissionsModule,
+  ],
+  controllers: [AppController], // Only AppController
   providers: [AppService],
 })
 export class AppModule {}

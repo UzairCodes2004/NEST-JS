@@ -3,9 +3,9 @@ import {
 } from '@nestjs/common';
 import { IssuesService } from '../issues/issues.service';
 import { UsersService } from '../users/users.service';
-import { CommentsService } from '../comments/comments.service';
 import { DatabaseService } from '../database/database.service';
 import { UpdateIssueDto } from '../issues/dto/update-issue.dto';
+
 export type UserRole = 'SUPERADMIN' | 'MANAGER' | 'USER';
 
 @Injectable()
@@ -14,9 +14,9 @@ export class AdminService {
     private readonly issuesService: IssuesService,
     private readonly usersService: UsersService,
     private readonly databaseService: DatabaseService,
-  ) { }
+  ) {}
 
-  // Helper: Role check ──
+  // Helper: Role check
   private checkRole(userRole: UserRole, allowed: UserRole[]): void {
     if (!allowed.includes(userRole)) {
       throw new ForbiddenException(
@@ -25,9 +25,8 @@ export class AdminService {
     }
   }
 
-  // ─── USERS ─────
+  // ─── USERS ────────────────────────────────────────────────────────────────
 
-  // Admin-only: Get ALL users (including role, registration method)
   async getAllUsers(userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN']);
     return this.databaseService.users.findMany({
@@ -47,13 +46,11 @@ export class AdminService {
     });
   }
 
-  //  UsersService for getting a single user (but with admin context)
   async getUserById(id: number, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN']);
     return this.usersService.findOne(id);
   }
 
-  // Admin-only: Change any user's role
   async updateUserRole(userId: number, newRole: UserRole, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN']);
 
@@ -79,20 +76,14 @@ export class AdminService {
     });
   }
 
-  // Admin-only: Delete any user
-  // src/admin/admin.service.ts
-
-  // ✅ Admin-only: Delete any user (with cleanup)
   async deleteUser(userId: number, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN']);
 
-    // 1. Check if user exists
     const user = await this.databaseService.users.findUnique({
       where: { id: userId },
     });
     if (!user) throw new NotFoundException('User not found');
 
-    // 2. Prevent deleting the last SUPERADMIN
     if (user.role === 'SUPERADMIN') {
       const count = await this.databaseService.users.count({
         where: { role: 'SUPERADMIN' },
@@ -102,7 +93,6 @@ export class AdminService {
       }
     }
 
-    // 3. Delete all comments & issues belonging to this user
     await this.databaseService.comment.deleteMany({
       where: { userID: userId },
     });
@@ -110,16 +100,14 @@ export class AdminService {
       where: { userID: userId },
     });
 
-    // 4. Now safely delete the user
     return this.databaseService.users.delete({
       where: { id: userId },
       select: { id: true, email: true, name: true },
     });
   }
 
-  // ─── ISSUES ─────────
+  // ─── ISSUES ──────────────────────────────────────────────────────────────
 
-  // Admin-only: Get ALL issues (with comments, user details)
   async getAllIssues(userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
     return this.databaseService.issue.findMany({
@@ -143,28 +131,24 @@ export class AdminService {
     });
   }
 
-  // Reuse IssuesService for single issue
-  async getIssueById(id: number,userId:number, userRole: UserRole) {
+  // ✅ Fixed: `findOne` now only expects `id`
+  async getIssueById(id: number, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
-    return this.issuesService.findOne(id,userId,userRole);
+    return this.issuesService.findOne(id);
   }
 
-  // Admin only: Update any issue (reuse IssuesService.editIssue)
   async updateIssue(id: number, updatedIssue: UpdateIssueDto, userRole: UserRole, adminUserId: number) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
-    // Reuse the existing editIssue but pass the admin's ID as the "editor"
-    return this.issuesService.editIssue(id, updatedIssue, adminUserId,userRole);
+    return this.issuesService.editIssue(id, updatedIssue, adminUserId, userRole);
   }
 
-  // Admin only: Delete ANY issue (SUPERADMIN only)
-  async deleteIssue(id: number,userId:number, userRole: UserRole) {
-    this.checkRole(userRole, ['SUPERADMIN']); // only SUPERADMIN can delete ANY issue
-    return this.issuesService.delete(id,userId,userRole); // ← reuse IssuesService.delete
+  async deleteIssue(id: number, userId: number, userRole: UserRole) {
+    this.checkRole(userRole, ['SUPERADMIN']);
+    return this.issuesService.delete(id, userId, userRole);
   }
 
-  // ─── COMMENTS ────
+  // ─── COMMENTS ─────────────────────────────────────────────────────────────
 
-  // Admin only: Get ALL comments
   async getAllComments(userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
     return this.databaseService.comment.findMany({
@@ -180,20 +164,16 @@ export class AdminService {
     });
   }
 
-  // Admin only: Delete ANY comment (bypass ownership check)
   async deleteComment(id: number, userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);
-
-    // Find the comment first
     const comment = await this.databaseService.comment.findUnique({
       where: { id },
     });
     if (!comment) throw new NotFoundException('Comment not found');
-
     return this.databaseService.comment.delete({ where: { id } });
   }
 
-  // ─── DASHBOARD STATS ───
+  // ─── DASHBOARD STATS ─────────────────────────────────────────────────────
 
   async getStats(userRole: UserRole) {
     this.checkRole(userRole, ['SUPERADMIN', 'MANAGER']);

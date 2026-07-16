@@ -1,10 +1,23 @@
-import { Controller, ValidationPipe, Post, Body, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  ValidationPipe,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+  Get,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { LoginTypes } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { ForgotPasswordDto } from './dto/forgotpassword.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';        // updated DTO
-import { ValidateResetTokenDto } from './dto/validate-reset-token.dto'; // updated DTO
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
+import { RequestWithUser } from '../common/interfaces/request-with-user.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -28,14 +41,19 @@ export class AuthController {
   @Post('validate-reset-token')
   @HttpCode(HttpStatus.OK)
   async validateResetToken(@Body(ValidationPipe) input: ValidateResetTokenDto) {
-   
     return this.authService.validateResetTokenWithData(input.data);
   }
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body(ValidationPipe) input: ResetPasswordDto) {
-   
     return this.authService.resetPasswordWithData(input.data, input.newPassword);
+  }
+
+  // ─── NEW: Get current user's permissions ────────────────────────────────
+  @Get('permissions/me')
+  @UseGuards(AuthGuard('jwt'))
+  async getMyPermissions(@Req() req: RequestWithUser) {
+    return this.authService.getCurrentUserPermissions(req.user.id);
   }
 }

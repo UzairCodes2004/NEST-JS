@@ -1,26 +1,14 @@
-// src/comments/comments.service.ts
-
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { PermissionsService, CommentResource, UserContext } from '../common/permission/permission.service';
-import { IssuesService } from '../issues/issues.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
-import { toRole } from '../common/enums/role.enum';
 
 @Injectable()
 export class CommentsService {
-  constructor(
-    private readonly databaseService: DatabaseService,
-    private readonly permissions: PermissionsService,
-    private readonly issuesService: IssuesService,
-  ) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
-  async create(createCommentDto: CreateCommentDto, userId: number, userRole: string) {
-    // Delegate permission check to IssuesService (which uses PermissionsService)
-    await this.issuesService.findOne(createCommentDto.issueID, userId, userRole);
-    // If it didn't throw, user has permission
-
+  // ─── CREATE (NO permission checks) ──────────────────────────────────────
+  async create(createCommentDto: CreateCommentDto, userId: number) {
     return this.databaseService.comment.create({
       data: {
         text: createCommentDto.text,
@@ -30,7 +18,8 @@ export class CommentsService {
     });
   }
 
-  async update(id: number, updateCommentDto: UpdateCommentDto, userId: number, userRole: string) {
+  // ─── UPDATE (NO permission checks) ──────────────────────────────────────
+  async update(id: number, updateCommentDto: UpdateCommentDto, userId: number) {
     const existing = await this.databaseService.comment.findUnique({
       where: { id },
       select: { userID: true },
@@ -38,13 +27,6 @@ export class CommentsService {
 
     if (!existing) {
       throw new NotFoundException('Comment not found');
-    }
-
-    const user: UserContext = { id: userId, role: toRole(userRole) };
-    const resource: CommentResource = { id, userID: existing.userID };
-
-    if (!this.permissions.canEditComment(user, resource)) {
-      throw new ForbiddenException('You do not have permission to edit this comment');
     }
 
     return this.databaseService.comment.update({
@@ -53,7 +35,8 @@ export class CommentsService {
     });
   }
 
-  async delete(id: number, userId: number, userRole: string) {
+  // ─── DELETE (NO permission checks) ──────────────────────────────────────
+  async delete(id: number, userId: number) {
     const existing = await this.databaseService.comment.findUnique({
       where: { id },
       select: { userID: true },
@@ -63,16 +46,10 @@ export class CommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-    const user: UserContext = { id: userId, role: toRole(userRole) };
-    const resource: CommentResource = { id, userID: existing.userID };
-
-    if (!this.permissions.canDeleteComment(user, resource)) {
-      throw new ForbiddenException('You do not have permission to delete this comment');
-    }
-
     return this.databaseService.comment.delete({ where: { id } });
   }
 
+  // ─── GET ALL COMMENTS FOR ISSUE ─────────────────────────────────────────
   async findAllForIssue(issueId: number) {
     return this.databaseService.comment.findMany({
       where: { issueID: issueId },
@@ -82,6 +59,31 @@ export class CommentsService {
         },
       },
       orderBy: { createdAT: 'desc' },
+    });
+  }
+
+  // ─── FETCH RAW (for permission checks in controller) ────────────────────
+
+  // Fetch issue raw (for permission check in controller)
+  async findIssueRaw(issueId: number) {
+    return this.databaseService.issue.findUnique({
+      where: { id: issueId },
+      select: { id: true, userID: true },
+    });
+  }
+
+  // Fetch comment raw (without permission checks)
+  async findOneRaw(id: number) {
+    return this.databaseService.comment.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        text: true,
+        userID: true,
+        issueID: true,
+        createdAT: true,
+        updatedAT: true,
+      },
     });
   }
 }

@@ -7,6 +7,7 @@ import { UsersModule } from '../users/users.module';
 import { EmailModule } from '../email/email.module';
 import { JwtStrategy } from './jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
+import { PermissionsModule } from '../common/permission/permission.module';
 
 @Module({
   providers: [AuthService,JwtStrategy],
@@ -20,7 +21,7 @@ import { PassportModule } from '@nestjs/passport';
       secret:process.env.JWT_SECRET,
       signOptions:{expiresIn:'3d'},
       
-    })
+    }), PermissionsModule
   ]
 
 })

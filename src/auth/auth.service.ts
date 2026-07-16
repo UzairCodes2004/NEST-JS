@@ -5,7 +5,8 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from '../email/email.service';
 import { createHash, randomBytes } from 'crypto';
-import { Role, toRole } from '../common/enums/role.enum';
+import { Role, toRole, Permission } from '../common/enums/role.enum';
+import { PermissionsService } from '../common/permission/permission.service'; 
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
     private emailService: EmailService,
+    private readonly permissionsService: PermissionsService, 
   ) {}
 
   // ─── Promote to SUPERADMIN if email is in whitelist ────────────────────
@@ -80,7 +82,7 @@ export class AuthService {
           name,
           password: null,
           registered: 'GOOGLE_OAUTH',
-          role: Role.USER, // Default role
+          role: Role.USER,
         },
       });
     }
@@ -361,18 +363,31 @@ export class AuthService {
     }
   }
 
-async validateResetTokenWithData(data: string): Promise<{ valid: boolean; email?: string }> {
-  const { email, token } = this.decodeResetData(data);
-  try {
-    await this.validateResetToken(email, token);
-    return { valid: true, email };
-  } catch (error) {
-    return { valid: false };
+  async validateResetTokenWithData(data: string): Promise<{ valid: boolean; email?: string }> {
+    const { email, token } = this.decodeResetData(data);
+    try {
+      await this.validateResetToken(email, token);
+      return { valid: true, email };
+    } catch (error) {
+      return { valid: false };
+    }
   }
-}
 
   async resetPasswordWithData(data: string, newPassword: string): Promise<{ message: string }> {
     const { email, token } = this.decodeResetData(data);
     return await this.resetPassword(email, token, newPassword);
+  }
+
+  // ─── NEW: Get current user's permissions ──────────────────────────────────
+  async getCurrentUserPermissions(userId: number): Promise<{ role: Role; permissions: Permission[] }> {
+    const user = await this.databaseService.users.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const role = toRole(user.role);
+    return this.permissionsService.getUserPermissions(role);
   }
 }

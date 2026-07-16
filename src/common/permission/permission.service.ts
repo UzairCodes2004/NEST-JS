@@ -1,9 +1,14 @@
-// ─── Centralized permission service ────
+// ─── Centralized permission service ─────────────────────────────────────
+// This service resolves permissions for users based on their role.
+// It uses the centralized ROLE_PERMISSIONS mapping from role.enum.ts.
+// Controllers use this service to check permissions before invoking business logic.
 
 import { Injectable } from '@nestjs/common';
-import { Role, isAdmin, isManager } from '../enums/role.enum';
+import {
+  Role,Permission, hasPermission, getPermissionsForRole, isAdmin, isManager,} from '../enums/role.enum';
 
-// using only those fields that are necessary for permissions 
+// ─── Types ───────────
+
 export interface UserContext {
   id: number;
   role: Role;
@@ -19,56 +24,147 @@ export interface CommentResource {
   userID: number;
 }
 
+export interface UserPermissionsResponse {
+  role: Role;
+  permissions: Permission[];
+}
+
 @Injectable()
 export class PermissionsService {
-  // ─── Issues ────────────
+  // ─── Get all permissions for a user ────────────────────────────────────
+  getUserPermissions(role: Role): UserPermissionsResponse {
+    return {
+      role,
+      permissions: getPermissionsForRole(role),
+    };
+  }
+
+  // ─── Check if a user has a specific permission ──────────────────────────
+  hasPermission(user: UserContext, permission: Permission): boolean {
+    return hasPermission(user.role, permission);
+  }
+
+  // ─── Issue Permissions ──────────────────────────────────────────────────
 
   canViewIssue(user: UserContext, issue: IssueResource): boolean {
-
-    // Super admin and manager can view all isssues 
-
-    if (isAdmin(user.role) || isManager(user.role)) return true;
-
+    // SUPERADMIN/MANAGER can view all issues
+    if (this.hasPermission(user, Permission.VIEW_ALL_ISSUES)) {
+      return true;
+    }
     // USER can only view their own
-    return user.id === issue.userID;
+    if (this.hasPermission(user, Permission.VIEW_ISSUE)) {
+      return user.id === issue.userID;
+    }
+    return false;
   }
 
   canEditIssue(user: UserContext, issue: IssueResource): boolean {
-    if (isAdmin(user.role) || isManager(user.role)) return true;
-    return user.id === issue.userID;
+    // Check if user can edit ANY issue (MANAGER or SUPERADMIN)
+    if (this.hasPermission(user, Permission.EDIT_ANY_ISSUE)) {
+      return true;
+    }
+    // Check if user can edit ONLY their own issue (USER)
+    if (this.hasPermission(user, Permission.EDIT_OWN_ISSUE)) {
+      return user.id === issue.userID;
+    }
+    return false;
   }
 
   canDeleteIssue(user: UserContext, issue: IssueResource): boolean {
-    // Only SUPER_ADMIN or the creator can delete
-    if (user.role === Role.SUPERADMIN) return true;
-    return user.id === issue.userID;
+    // Check if user can delete ANY issue (MANAGER or SUPERADMIN)
+    if (this.hasPermission(user, Permission.DELETE_ANY_ISSUE)) {
+      return true;
+    }
+    // Check if user can delete ONLY their own issue (USER)
+    if (this.hasPermission(user, Permission.DELETE_OWN_ISSUE)) {
+      return user.id === issue.userID;
+    }
+    return false;
   }
 
   canChangeStatus(user: UserContext, issue: IssueResource): boolean {
-    // manager , admin and the one that created the issue can change the status of the issue 
+    // Same as edit – MANAGER + SUPERADMIN can change status
     return this.canEditIssue(user, issue);
   }
 
-  // Comments 
+  // ─── Comment Permissions ──────────────────────────────────────────────────
 
-  canViewComment(_user: UserContext, _comment: CommentResource): boolean {
+  canViewComment(user: UserContext, _comment: CommentResource): boolean {
     // Viewing comment is allowed if user can view the parent issue.
-    // Handled by the parent issue check in the controller.
+    // The parent issue check is handled in the controller.
     return true;
   }
 
   canCreateComment(user: UserContext, issue: IssueResource): boolean {
-    // to comment user should be able to see 
+    // To comment, user must be able to view the issue
     return this.canViewIssue(user, issue);
   }
 
   canEditComment(user: UserContext, comment: CommentResource): boolean {
-    if (isAdmin(user.role)|| isManager(user.role)) return true;
-    return user.id === comment.userID;
+    // Check if user can edit ANY comment (MANAGER or SUPERADMIN)
+    if (this.hasPermission(user, Permission.EDIT_ANY_COMMENT)) {
+      return true;
+    }
+    // Check if user can edit ONLY their own comment (USER)
+    if (this.hasPermission(user, Permission.EDIT_OWN_COMMENT)) {
+      return user.id === comment.userID;
+    }
+    return false;
   }
 
   canDeleteComment(user: UserContext, comment: CommentResource): boolean {
-    if (isAdmin(user.role)|| isManager(user.role)) return true;
-    return user.id === comment.userID;
+    // Check if user can delete ANY comment (MANAGER or SUPERADMIN)
+    if (this.hasPermission(user, Permission.DELETE_ANY_COMMENT)) {
+      return true;
+    }
+    // Check if user can delete ONLY their own comment (USER)
+    if (this.hasPermission(user, Permission.DELETE_OWN_COMMENT)) {
+      return user.id === comment.userID;
+    }
+    return false;
+  }
+
+  // ─── Manager Request Permissions ──────────────────────────────────────
+
+  canViewManagerRequests(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.VIEW_MANAGER_REQUESTS);
+  }
+
+  canReviewManagerRequests(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.REVIEW_MANAGER_REQUESTS);
+  }
+
+  // ─── User Management Permissions ──────────────────────────────────────
+
+  canViewUsers(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.VIEW_USERS);
+  }
+
+  canEditUserRole(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.EDIT_USER_ROLE);
+  }
+
+  canDeleteUser(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.DELETE_USER);
+  }
+
+  // ─── Admin Panel Access ────────────────────────────────────────────────
+
+  canAccessAdminPanel(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.ACCESS_ADMIN_PANEL);
+  }
+
+  canAccessManagerPanel(user: UserContext): boolean {
+    return this.hasPermission(user, Permission.ACCESS_MANAGER_PANEL);
+  }
+
+  // ─── Legacy helpers (kept for backward compatibility, but use permissions internally) ──
+
+  isAdmin(role: Role): boolean {
+    return isAdmin(role);
+  }
+
+  isManager(role: Role): boolean {
+    return isManager(role);
   }
 }
